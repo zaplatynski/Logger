@@ -50,5 +50,3 @@ prompt &LOGGER_USER user successfully created.
 prompt Important!!! Connect as the &LOGGER_USER user and run the logger_install.sql script.
 prompt
 prompt
-
-exit
