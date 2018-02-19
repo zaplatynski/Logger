@@ -1,3 +1,8 @@
+-- Note this file is currently NOT generated so don't delete
+
+-- Added this in as noop may not have all these objects
+whenever sqlerror continue
+
 drop package logger
 /
 

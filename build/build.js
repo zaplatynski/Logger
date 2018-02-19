@@ -39,6 +39,8 @@ fn.appendObjects(config.objects.preInstall, 'prereqs', true);
 
 // TODO mdsouza: noop prompts (see build.sh)
 
+// sequences
+fn.appendObjects(config.objects.sequences, 'sequences', false);
 // tables
 fn.appendObjects(config.objects.tables, 'tables', true);
 // jobs
@@ -74,6 +76,23 @@ installContents = installContents.replace(/x\.x\.x/g, `${params.version.major}.$
 fn.fs.writeFile(config.files.install, installContents);
 
 
+// TODO Drops
+// whenever sqlerror continue
+// packages
+// procedures
 
+// tables (need to go in this order;)
+//   logger_logs_apex_items cascade constraints
+//   logger_prefs cascade constraints
+//   table logger_logs cascade constraints
+//   table logger_prefs_by_client_id cascade constraints
+
+// Sequences (Not sure where we call these)
+
+// Jobs: (run one at a time)
+// dbms_scheduler.drop_job('LOGGER_PURGE_JOB');
+// dbms_scheduler.drop_job('LOGGER_UNSET_PREFS_BY_CLIENT');
+
+// Views
 
 
