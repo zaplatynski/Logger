@@ -18,17 +18,15 @@ let params = fn.getParameters();
 //   fn.writeFile(config.files[file], '');
 // }
 
-console.log(config.installPath);
-
 // Clear Install directory
-let files = fs.readdirSync(path.resolve(__dirname, config.installPath));
+// let files = fs.readdirSync(path.resolve(__dirname, path.dirname(config.files.install)));
 
-files.forEach(function(myFile){
-  // As part of new install restructure (#194) be safe to explicitly list files to delete
-  if (myFile === 'logger_install.sql') { 
-    fs.unlinkSync(path.resolve(__dirname, config.installPath, myFile));
-  }
-});
+// files.forEach(function(myFile){
+//   // As part of new install restructure (#194) be safe to explicitly list files to delete
+//   if (myFile === 'logger_install.sql') { 
+//     fs.unlinkSync(path.resolve(__dirname, path.dirname(config.files.install), myFile));
+//   }
+// });
 
 
 fn.fs.writeFile(config.files.install, '');
@@ -76,23 +74,7 @@ installContents = installContents.replace(/x\.x\.x/g, `${params.version.major}.$
 fn.fs.writeFile(config.files.install, installContents);
 
 
-// TODO Drops
-// whenever sqlerror continue
-// packages
-// procedures
-
-// tables (need to go in this order;)
-//   logger_logs_apex_items cascade constraints
-//   logger_prefs cascade constraints
-//   table logger_logs cascade constraints
-//   table logger_prefs_by_client_id cascade constraints
-
-// Sequences (Not sure where we call these)
-
-// Jobs: (run one at a time)
-// dbms_scheduler.drop_job('LOGGER_PURGE_JOB');
-// dbms_scheduler.drop_job('LOGGER_UNSET_PREFS_BY_CLIENT');
-
-// Views
+// Build uninstall
+fn.buildUninstall();
 
 

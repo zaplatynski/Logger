@@ -1,7 +1,6 @@
 // Storing config in a .js file to have ability to comment
 var
   objects = {},
-  installPath = '../install', 
   files = {
     install : '../install/logger_install.sql',
     uninstall: '../install/logger_uninstall.sql'
@@ -82,19 +81,23 @@ objects.sequences = [
 objects.tables = [
   {
     name: 'logger_logs',
-    src: '../tables/logger_logs.sql'
+    src: '../tables/logger_logs.sql',
+    dropOrder: 3
   },
   {
     name: 'logger_prefs',
-    src: '../tables/logger_prefs.sql'
+    src: '../tables/logger_prefs.sql',
+    dropOrder: 2
   },
   {
     name: 'logger_logs_apex_items',
-    src: '../tables/logger_logs_apex_items.sql'
+    src: '../tables/logger_logs_apex_items.sql',
+    dropOrder: 1
   },
   {
     name: 'logger_prefs_by_client_id',
-    src: '../tables/logger_prefs_by_client_id.sql'
+    src: '../tables/logger_prefs_by_client_id.sql',
+    dropOrder: 4
   }
 ];
 
@@ -118,4 +121,3 @@ objects.views = [
 
 module.exports.objects = objects;
 module.exports.files = files;
-module.exports.installPath = installPath;
