@@ -9,3 +9,5 @@ releases/*
 temp/*
 #For IMDone Atom.io plugin
 .imdone/*
+# VSC Task connection string
+.vscode/vsc-task-env

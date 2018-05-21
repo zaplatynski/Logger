@@ -1,0 +1,53 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile: oos-logger",
+      "type": "shell",
+      // Run sqlplus via a batch file
+      "windows": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      "osx": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      "linux": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
+      // second argument is the file to execute (ie the current file)
+      "args": [
+        "ignore", //Leave blank
+        "@\"${file}\"",
+        "${fileBasename}"
+      ],
+      "group": "build",
+      // do not switch to the output pane automatically
+      "presentation": {
+        "reveal": "always", // always, never, silent
+        "panel": "dedicated" // shared, dedicated, new
+      },
+      // use this to get any database errors (from user_errors view) listed in the "Problems" pane in VS Code
+      "problemMatcher": {
+        "owner": "plsql",
+        "fileLocation": [
+          "relative",
+          "${fileDirname}"
+        ],
+        "pattern": [
+          {
+            "regexp": "(.*) (\\d*)\/(\\d*) (.*?) (.*)",
+            "severity": 1,
+            "line": 2,
+            "column": 3,
+            "file": 4,
+            "message": 5,
+            "loop": true
+          }
+        ]
+      }
+    }
+  ]
+}
