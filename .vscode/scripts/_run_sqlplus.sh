@@ -26,7 +26,9 @@ fi
 source $ENV_FILE
 
 if [ -z "$ORACLE_SQL_CONNECTION" ] || [ $ORACLE_SQL_CONNECTION = "CHANGEME" ] ; then
-  echo "${RED}*** CONFIG ERROR ***\n${NC}You need to edit $ENV_FILE and define the full connection string to your database. Ex: giffy/giffy@localhost:32122/orclpdb514.localdomain"
+  echo "${RED}*** CONFIG ERROR ***\n${NC}You need to edit ${LIGHT_GREEN}$ENV_FILE${NC} and define the full connection string to your database. Ex: ${LIGHT_GREEN}giffy/giffy@localhost:32122/orclpdb514.localdomain${NC}"
+  echo "Opening File"
+  code $ENV_FILE
   # End process
   kill -INT $$
 fi
@@ -42,7 +44,7 @@ $2
 set define on
 @$SQL_FILE_COLOR
 -- Colors: http://orasql.org/2013/05/22/sqlplus-tips-6-colorizing-output/
-prompt &_CB_WHITE &_C_BLACK :: show errors :: &_C_RESET &_C_RED
+prompt &_C_RED
 show errors
 prompt &_C_RESET
 -- @_show_errors.sql $3
