@@ -49,7 +49,9 @@ fn.getParameters = function () {
   params.values.version = {
     major: tmpVersion[0],
     minor: tmpVersion[1],
-    patch: tmpVersion[2]
+    patch: tmpVersion[2],
+    // String representation of the version
+    string: tmpVersion.join('.')
   };
 
   return params.values;
@@ -65,13 +67,20 @@ fn.getParameters = function () {
 fn.appendObjects= function(objArray, desc, noopReq){
 
   // TODO #78: Need to build tables for no_op to reference
+  let files = [config.files.install];
 
-  fn.fs.appendFile(config.files.install, `\n\nprompt *** ${desc.toUpperCase()} ***\n\n`);
-  
-  objArray.forEach(function (obj) {
-    fn.fs.appendFile(config.files.install, `\nprompt ${obj.name}\n`);
-    fn.fs.appendFile(config.files.install, fn.fs.readFile(obj.src));
-  }); // tables
+  if (noopReq){
+    files.push(config.files.installNoop);
+  }
+
+  files.forEach(file => {
+    fn.fs.appendFile(file, `\n\nprompt *** ${desc.toUpperCase()} ***\n\n`);
+    
+    objArray.forEach(function (obj) {
+      fn.fs.appendFile(file, `\nprompt ${obj.name}\n`);
+      fn.fs.appendFile(file, fn.fs.readFile(obj.src));
+    }); // tables
+  })
 };//appendObjects
 
 /**

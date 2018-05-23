@@ -1,12 +1,19 @@
 // Storing config in a .js file to have ability to comment
-var
-  objects = {},
-  files = {
-    install : '../install/logger_install.sql',
-    uninstall: '../install/logger_uninstall.sql'
-  }
-;
+let objects = {};
+let files = {
+  install : '../install/logger_install.sql',
+  installNoop : '../install/logger_install_noop.sql',
+  uninstall : '../install/logger_uninstall.sql',
+  generateNoop: 'gen_noop.sql'
+};
+// TODO this should be moved to something specific for developers
+let sqlclConnectionString = 'sqlcl giffy/giffy@localhost:32122/orclpdb514.localdomain';
 
+// TODO this should be documented in build docs
+// TODO mdsouza: should we call this something else (i.e. cmd.plmddoc) in case we get other commands?
+let cmd = {
+  plmddoc: `node ~/Documents/GitHub/oraopensource/plsql-md-doc/app.js logger`
+};
 
 // Contexts
 objects.contexts = [
@@ -121,3 +128,4 @@ objects.views = [
 
 module.exports.objects = objects;
 module.exports.files = files;
+module.exports.cmd = cmd;
