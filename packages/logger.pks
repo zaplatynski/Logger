@@ -25,8 +25,12 @@ as
   -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   -- SOFTWARE.
 
-
   -- TYPES
+  /**
+  * @type rec_param `name`/`val` pair
+  * @type tab_param Array of `rec_param`
+  * @type rec_logger_log See [Logger Plugins](TODO LinkPlugins.md)
+  */
   type rec_param is record(
     name varchar2(255),
     val varchar2(4000));
@@ -39,7 +43,37 @@ as
   );
 
 
-  -- VARIABLES
+  -- CONSTANTS
+  /**
+  * @constant g_logger_version Version of Logger as a string (`major.minor.patch`)
+  * @constant g_context_name Context Logger uses for storing attributes.
+  *
+  * @constant g_off Logger level `off`
+  * @constant g_permanent Logger level `permanent`
+  * @constant g_error Logger level `error`
+  * @constant g_warning Logger level `warning`
+  * @constant g_information Logger level `information`
+  * @constant g_debug Logger level `debug`
+  * @constant g_timing Logger level `timing`
+  * @constant g_sys_context Logger level `sys_context`
+  * @constant g_apex Logger level `apex`
+  *
+  * @constant g_off_name Logger level `off` (name)
+  * @constant g_permanent_name Logger level `permanent` (name)
+  * @constant g_error_name Logger level `error` (name)
+  * @constant g_warning_name Logger level `warning` (name)
+  * @constant g_information_name Logger level `information` (name)
+  * @constant g_debug_name Logger level `debug` (name)
+  * @constant g_timing_name Logger level `timing` (name)
+  * @constant g_sys_context_name Logger level `sys_context` (name)
+  * @constant g_apex_name Logger level `apex` (name)
+  *
+  * @constant gc_empty_tab_param Empty param used for default value in logger main procedures.
+  *
+  * @constant g_apex_item_type_all `log_apex_items` takes in an optional variable `p_item_scope`. This determines which items to log in APEX. Log both application and page level items
+  * @constant g_apex_item_type_app Only application level items
+  * @constant g_apex_item_type_page Only page level items
+  */
 	g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
 	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
 
