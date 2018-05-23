@@ -5,16 +5,13 @@
 
 # Env variables $1, $2, etc are from the tasks.json args array
 
-# Colors
-RED='\033[0;31m'
-LIGHT_GREEN='\033[0;92m'
-NC='\033[0m' # No Color
-
 # Get the database connection string
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 ENV_FILE_NAME="../vsc-task-env"
 ENV_FILE=$DIR/$ENV_FILE_NAME
 SQL_FILE_COLOR=$DIR/colors.sql
+
+source $DIR/colors.sh
 
 # Check if connection file is missing
 if [ ! -f $ENV_FILE ]; then
