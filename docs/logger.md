@@ -86,6 +86,8 @@
  
 - [INS_LOGGER_LOGS Procedure](#ins_logger_logs)
  
+- [SET_LEVEL Procedure](#set_level)
+ 
 - [UNSET_CLIENT_LEVEL Procedure](#unset_client_level)
  
 - [UNSET_CLIENT_LEVEL-1 Procedure](#unset_client_level-1)
@@ -559,7 +561,7 @@ Name | Description
 ### Syntax
 ```plsql
 procedure log_apex_items(
-  p_text in varchar2 default 'Log APEX Items',
+  p_text in varchar2 default 'Log APEX Items. Query logger_logs_apex_items and filter on log_id',
   p_scope in logger_logs.scope%type default null,
   p_item_type in varchar2 default logger.g_apex_item_type_all,
   p_log_null_items in boolean default true,
@@ -1608,6 +1610,93 @@ end;
 /
 
 ID: 2930650
+```
+
+
+
+ 
+## SET_LEVEL Procedure<a name="set_level"></a>
+
+
+<p>
+<p>Sets the logger level (for bboth system and client logging levels.)</p><p>Logger allows you to configure both system logging levels and client specific logging levels. If a client specific logging level is defined, it will override the system level configuration. If no client level is defined Logger will defautl to the system level configuration.</p><p>Prior to version 2.0.0 Logger only supported a &quot;global&quot; logger level. The primary goal of this approach was to enable Logger at <code>debug</code> level for development environments, then change it to <code>error</code> level in production environments so the logs did not slow down the system. Over time developers start to find that in some situations they needed to see what a particular user / session was doing in production. Their only option was to enable Logger for the entire system which could potentially slow everyone down.</p><p>Starting in version 2.0.0 you can now specify the logger level (along with call stack setting) by specifying the <code>client_identifier</code>. If not explicitly unset, client specific configurations will expire after a set period of time.</p><p>The following query shows all the current client specific log configurations:</p><pre><code class="lang-sql">select *
+from logger_prefs_by_client_id;
+
+CLIENT_ID           LOGGER_LEVEL  INCLUDE_CALL_STACK CREATED_DATE         EXPIRY_DATE
+------------------- ------------- ------------------ -------------------- --------------------
+logger_demo_session ERROR         TRUE               24-APR-2013 02:48:13 24-APR-2013 14:48:13
+</code></pre>
+
+</p>
+
+### Syntax
+```plsql
+procedure set_level(
+  p_level in varchar2 default logger.g_debug_name,
+  p_client_id in varchar2 default null,
+  p_include_call_stack in varchar2 default null,
+  p_client_id_expire_hours in number default null
+)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | Use <code>logger.g_&lt;level&gt;_name</code> constants. If the level is deprecated it will automatically be set to <code>debug</code>.
+`p_client_id` | Optional: If defined, will set the level for the given client identifier. If <code>null</code> will set global settings.  In APEX the <code>client_identifier</code> is <code>:APP_USER || &#39;:&#39; || :APP_SESSION</code>
+`p_include_call_stack` | Optional: Only valid if <code>p_client_id</code> is defined. Valid values: <code>TRUE</code>, <code>FALSE</code>. If not set will use the default system pref in <code>logger_prefs</code>.
+`p_client_id_expire_hours` | Optiona: If <code>p_client_id</code> is defined , expire after number of hours. If not defined, will default to system preference <code>PREF_BY_CLIENT_ID_EXPIRE_HOURS</code>
+ 
+ 
+
+
+### Example
+```plsql
+
+-- Set system level logging level:
+exec logger.set_level(logger.g_debug_name);
+
+-- Client Specific Configuration:
+-- In Oracle Session-1
+exec logger.set_level(logger.g_debug_name);
+
+exec logger.log('Session-1: this should show up');
+
+select id, logger_level, text, client_identifier, call_stack
+from logger_logs_5_min
+order by id;
+
+  ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
+---- ------------ ----------------------------------- ----------------- ----------------------------
+  31         16 Session-1: this should show up              object      line  object
+
+exec logger.set_level (logger.g_error_name);
+
+exec logger.log('Session-1: this should NOT show up');
+
+-- The previous line does not get logged since the logger level is set to ERROR and it made a .log call
+
+
+-- In Oracle Session-2 (i.e. a different session)
+exec dbms_session.set_identifier('my_identifier');
+
+-- This sets the logger level for current identifier
+exec logger.set_level(logger.g_debug_name, sys_context('userenv','client_identifier'));
+
+exec logger.log('Session-2: this should show up');
+
+select id, logger_level, text, client_identifier, call_stack
+from logger_logs_5_min
+order by id;
+
+  ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
+---- ------------ ----------------------------------- ----------------- ----------------------------
+  31         16 Session-1: this should show up                  object      line  object
+  32         16 Session-2: this should show up    my_identifier   object      line  object
+
+-- Notice how the CLIENT_IDENTIFIER field also contains the current client_identifer
+-- In APEX the client_identifier is
+:APP_USER || ':' || :APP_SESSION
 ```
 
 

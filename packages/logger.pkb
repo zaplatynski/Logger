@@ -2811,7 +2811,6 @@ as
    * @param p_include_call_stack Optional: Only valid if `p_client_id` is defined. Valid values: `TRUE`, `FALSE`. If not set will use the default system pref in `logger_prefs`.
    * @param p_client_id_expire_hours Optiona: If `p_client_id` is defined , expire after number of hours. If not defined, will default to system preference `PREF_BY_CLIENT_ID_EXPIRE_HOURS`
    */
-  -- TODO mdsouza: check the produced documentation for this  as `:APP_USER || ':' || :APP_SESSION` seems to be lost in Github
   procedure set_level(
     p_level in varchar2 default logger.g_debug_name,
     p_client_id in varchar2 default null,
@@ -2828,6 +2827,7 @@ as
     l_id logger_logs.id%type;
     pragma autonomous_transaction;
   begin
+  -- TODO mdsouza: check the produced documentation for this  as `:APP_USER || ':' || :APP_SESSION` seems to be lost in Github
     $if $$no_op $then
       raise_application_error (-20000,
           'Either the NO-OP version of Logger is installed or it is compiled for NO-OP,  so you cannot set the level.');
