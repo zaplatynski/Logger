@@ -33,7 +33,7 @@ as
   */
   type rec_param is record(
     name varchar2(255),
-    val varchar2(4000));
+    val varchar2(32767));
 
   type tab_param is table of rec_param index by binary_integer;
 
