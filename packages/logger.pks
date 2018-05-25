@@ -246,7 +246,7 @@ as
     p_level in logger_logs.logger_level%type default null);
 
     procedure log_apex_items(
-      p_text in varchar2 default 'Log APEX Items',
+      p_text in varchar2 default 'Log APEX Items. Query logger_logs_apex_items and filter on log_id',
       p_scope in logger_logs.scope%type default null,
       p_item_type in varchar2 default logger.g_apex_item_type_all,
       p_log_null_items in boolean default true,
