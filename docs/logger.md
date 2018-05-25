@@ -8,16 +8,6 @@
 
 
  
-- [CONVERT_LEVEL_CHAR_TO_NUM Function](#convert_level_char_to_num)
- 
-- [CONVERT_LEVEL_NUM_TO_CHAR Function](#convert_level_num_to_char)
- 
-- [OK_TO_LOG Function](#ok_to_log)
- 
-- [OK_TO_LOG-1 Function](#ok_to_log-1)
- 
-- [DATE_TEXT_FORMAT Function](#date_text_format)
- 
 - [LOG Procedure](#log)
  
 - [LOG_INFORMATION Procedure](#log_information)
@@ -31,6 +21,16 @@
 - [LOG_ERROR Procedure](#log_error)
  
 - [LOG_PERMANENT Procedure](#log_permanent)
+ 
+- [CONVERT_LEVEL_CHAR_TO_NUM Function](#convert_level_char_to_num)
+ 
+- [CONVERT_LEVEL_NUM_TO_CHAR Function](#convert_level_num_to_char)
+ 
+- [OK_TO_LOG Function](#ok_to_log)
+ 
+- [OK_TO_LOG-1 Function](#ok_to_log-1)
+ 
+- [DATE_TEXT_FORMAT Function](#date_text_format)
  
 - [GET_CGI_ENV Function](#get_cgi_env)
  
@@ -67,8 +67,6 @@
 - [PURGE_ALL Procedure](#purge_all)
  
 - [STATUS Procedure](#status)
- 
-- [SET_LEVEL Procedure](#set_level)
  
 - [UNSET_CLIENT_LEVEL Procedure](#unset_client_level)
  
@@ -141,174 +139,6 @@ g_sys_context_name | <pre>  g_sys_context_name constant varchar2(30) := 'SYS_CON
 g_apex_name | <pre>  g_apex_name constant varchar2(30) := 'APEX';</pre> | Logger level &#x60;apex&#x60; (name)
 g_apex_item_type_all | <pre>  g_apex_item_type_all constant varchar2(30) := 'ALL';</pre> | &#x60;log_apex_items&#x60; takes in an optional variable &#x60;p_item_scope&#x60;. This determines which items to log in APEX. Log both application and page level items
 
-
-
-
-
-
- 
-## CONVERT_LEVEL_CHAR_TO_NUM Function<a name="convert_level_char_to_num"></a>
-
-
-<p>
-<p>Converts string names to text value</p><p>Changes</p><ul>
-<li>2.1.0: Start to use global variables and correct numbers</li>
-</ul>
-
-</p>
-
-### Syntax
-```plsql
-function convert_level_char_to_num(
-  p_level in varchar2) 
-  return number
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | String representation of level
-*return* | Returns the number representing the given level (string). &#x60;-1&#x60; if not found
- 
- 
-
-
-
-
-
- 
-## CONVERT_LEVEL_NUM_TO_CHAR Function<a name="convert_level_num_to_char"></a>
-
-
-<p>
-<p>Converts the logger level num to char format</p>
-</p>
-
-### Syntax
-```plsql
-function convert_level_num_to_char(
-  p_level in number)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | 
-*return* | Logger level string format. &#x60;null&#x60; if &#x60;p_level&#x60; not found
- 
- 
-
-
-
-
-
- 
-## OK_TO_LOG Function<a name="ok_to_log"></a>
-
-
-<p>
-<p>Determines if the statement can be stored in LOGGER_LOGS</p><p>Though Logger internally handles when a statement is stored in the <code>logger_logs</code> table there may be situations where you need to know if <code>logger</code> will log a statement before calling <code>logger</code>. This is useful when doing an expensive operation just to log the data.</p><p>A classic example is looping over an array for the sole purpose of logging the data. In this case, there&#39;s no reason why the code should perform the additional computations when logging is disabled for a certain level.</p><p><code>ok_to_log</code> will also factor in client specific logging settings.</p><p>Note: <code>ok_to_log</code> is not something that should be used frequently as all calls to <code>logger</code> run this command internally.<br />Note: <code>ok_to_log</code> should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok_to_log should not be used in the following way:</p>
-</p>
-
-### Syntax
-```plsql
-function ok_to_log(p_level in number)
-  return boolean
-  $if 1=1
-    and $$rac_lt_11_2
-    and not dbms_db_version.ver_le_10_2
-    and ($$no_op
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | Level (number)
-*return* | True of statement can be logged to LOGGER_LOGS
- 
- 
-
-
-### Example
-```plsql
-declare
-  type typ_array is table of number index by pls_integer;
-  l_array typ_array;
-begin
-  -- Load test data
-  for x in 1..100 loop
-    l_array(x) := x;
-  end loop;
-
-  -- Only log if logging is enabled
-  if logger.ok_to_log(logger.g_debug) then
-    for x in 1..l_array.count loop
-      logger.log(l_array(x));
-    end loop;
-  end if;
- end;
- /
-
--- ok_to_log should not be used for one-off log commands. 
--- This defeats the whole purpose of having the various log commands. 
--- For example ok_to_log should NOT be used in the following way:
-...
-if logger.ok_to_log(logger.g_debug) then
- logger.log('test');
-end if;
-...
-```
-
-
-
- 
-## OK_TO_LOG-1 Function<a name="ok_to_log-1"></a>
-
-
-<p>
-<p>See previous <code>ok_to_log</code> example</p>
-</p>
-
-### Syntax
-```plsql
-function ok_to_log(p_level in varchar2)
-  return boolean
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | Level (Name)
-*return* | True of log statements for that level or below will be logged
- 
- 
-
-
-
-
-
- 
-## DATE_TEXT_FORMAT Function<a name="date_text_format"></a>
-
-
-<p>
-<p>Returns the time difference (in nicely formatted string) of p_date compared to now (sysdate).</p>
-</p>
-
-### Syntax
-```plsql
-function date_text_format (p_date in date)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_date` | 
-*return* | formatting string
- 
- 
 
 
 
@@ -396,7 +226,7 @@ end p_demo_procedure;
 
 
 <p>
-<p>See <code>logger.log</code> documentation</p>
+<p>See <a href="#log"><code>logger.log</code></a> documentation</p>
 </p>
 
 ### Syntax
@@ -578,6 +408,174 @@ Name | Description
 
 
  
+## CONVERT_LEVEL_CHAR_TO_NUM Function<a name="convert_level_char_to_num"></a>
+
+
+<p>
+<p>Converts string names to text value</p><p>Changes</p><ul>
+<li>2.1.0: Start to use global variables and correct numbers</li>
+</ul>
+
+</p>
+
+### Syntax
+```plsql
+function convert_level_char_to_num(
+  p_level in varchar2) 
+  return number
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | String representation of level
+*return* | Returns the number representing the given level (string). &#x60;-1&#x60; if not found
+ 
+ 
+
+
+
+
+
+ 
+## CONVERT_LEVEL_NUM_TO_CHAR Function<a name="convert_level_num_to_char"></a>
+
+
+<p>
+<p>Converts the logger level num to char format</p>
+</p>
+
+### Syntax
+```plsql
+function convert_level_num_to_char(
+  p_level in number)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | 
+*return* | Logger level string format. &#x60;null&#x60; if &#x60;p_level&#x60; not found
+ 
+ 
+
+
+
+
+
+ 
+## OK_TO_LOG Function<a name="ok_to_log"></a>
+
+
+<p>
+<p>Determines if the statement can be stored in LOGGER_LOGS</p><p>Though Logger internally handles when a statement is stored in the <code>logger_logs</code> table there may be situations where you need to know if <code>logger</code> will log a statement before calling <code>logger</code>. This is useful when doing an expensive operation just to log the data.</p><p>A classic example is looping over an array for the sole purpose of logging the data. In this case, there&#39;s no reason why the code should perform the additional computations when logging is disabled for a certain level.</p><p><code>ok_to_log</code> will also factor in client specific logging settings.</p><p>Note: <code>ok_to_log</code> is not something that should be used frequently as all calls to <code>logger</code> run this command internally.<br />Note: <code>ok_to_log</code> should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok_to_log should not be used in the following way:</p>
+</p>
+
+### Syntax
+```plsql
+function ok_to_log(p_level in number)
+  return boolean
+  $if 1=1
+    and $$rac_lt_11_2
+    and not dbms_db_version.ver_le_10_2
+    and ($$no_op
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | Level (number)
+*return* | True of statement can be logged to LOGGER_LOGS
+ 
+ 
+
+
+### Example
+```plsql
+declare
+  type typ_array is table of number index by pls_integer;
+  l_array typ_array;
+begin
+  -- Load test data
+  for x in 1..100 loop
+    l_array(x) := x;
+  end loop;
+
+  -- Only log if logging is enabled
+  if logger.ok_to_log(logger.g_debug) then
+    for x in 1..l_array.count loop
+      logger.log(l_array(x));
+    end loop;
+  end if;
+ end;
+ /
+
+-- ok_to_log should not be used for one-off log commands. 
+-- This defeats the whole purpose of having the various log commands. 
+-- For example ok_to_log should NOT be used in the following way:
+...
+if logger.ok_to_log(logger.g_debug) then
+ logger.log('test');
+end if;
+...
+```
+
+
+
+ 
+## OK_TO_LOG-1 Function<a name="ok_to_log-1"></a>
+
+
+<p>
+<p>See previous <code>ok_to_log</code> example</p>
+</p>
+
+### Syntax
+```plsql
+function ok_to_log(p_level in varchar2)
+  return boolean
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | Level (Name)
+*return* | True of log statements for that level or below will be logged
+ 
+ 
+
+
+
+
+
+ 
+## DATE_TEXT_FORMAT Function<a name="date_text_format"></a>
+
+
+<p>
+<p>Returns the time difference (in nicely formatted string) of p_date compared to now (sysdate).</p>
+</p>
+
+### Syntax
+```plsql
+function date_text_format (p_date in date)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_date` | 
+*return* | formatting string
+ 
+ 
+
+
+
+
+
+ 
 ## GET_CGI_ENV Function<a name="get_cgi_env"></a>
 
 
@@ -687,10 +685,7 @@ Name | Description
 --- | ---
 `p_show_null` | If <code>true</code>, then variables that have no value will still be displayed.
 `p_scope` | <code>scope</code> to log CGI variables under.
-`p_level` | <ul>
-<li>@param p_level Highest level to run at (default <code>logger.g_debug</code>).  Example: If set to <code>logger.g_error</code> it will work when both in <code>debug</code> and <code>error</code> modes. However if set to <code>logger.g_debug</code>(default) will not store values when <code>level</code> is set to <code>error</code>.</li>
-</ul>
-
+`p_level` | Highest level to run at (default <code>logger.g_debug</code>).  Example: If set to <code>logger.g_error</code> it will work when both in <code>debug</code> and <code>error</code> modes. However if set to <code>logger.g_debug</code>(default) will not store values when <code>level</code> is set to <code>error</code>.
  
  
 
@@ -722,7 +717,7 @@ REMOTE_ADDR                   : 192.168.1.7
 
 
 <p>
-<p>Similar to <code>log_character_codes</code> except will return the character codes instead of logging them.</p>
+<p>Debugging issues with a string that contains control characters such as carriage returns, line feeds and tabs that can be very difficult.<br />The sql <code>dump()</code> function is great for this, but the output is a bit hard to read as it outputs the character codes for each character.<br />You end up comparing the character code to an ascii table to figure out what it is. </p><p>This function and the procedure <code>log_character_codes</code> makes it easier as it lines up the characters in the original string under the corresponding character codes from dump.<br />Additionally, all tabs are replaced with <code>^</code> and all other control characters such as <code>carriage returns</code> and <code>line feeds</code> are replaced with <code>~</code>. </p>
 </p>
 
 ### Syntax
@@ -746,13 +741,6 @@ Name | Description
 ### Example
 ```plsql
 
-Have you ever run into an issue with a string that contains control characters such as carriage returns, line feeds and tabs that are difficult to debug? 
-The sql `dump()` function is great for this, but the output is a bit hard to read as it outputs the character codes for each character. 
-You end up comparing the character code to an ascii table to figure out what it is. 
-
-This function and the procedure `log_character_codes` makes it easier as it lines up the characters in the original string under the corresponding character codes from dump. 
-Additionally, all tabs are replaced with `^` and all other control characters such as `carriage returns` and `line feeds` are replaced with `~`. 
-
 select logger.get_character_codes('Hello World'||chr(9)||'Foo'||chr(13)||chr(10)||'Bar') char_codes
 from dual;
 
@@ -770,7 +758,7 @@ Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
 
 
 <p>
-<p>Logs character codes for given string<br />See <code>get_character_codes</code> for detailed information</p>
+<p>Logs character codes for given string. See <code>get_character_codes</code> for detailed information</p>
 </p>
 
 ### Syntax
@@ -1261,93 +1249,6 @@ Pref by client_id expire : 12 hours
 For all client info see  : logger_prefs_by_client_id
 
 PL/SQL procedure successfully completed.
-```
-
-
-
- 
-## SET_LEVEL Procedure<a name="set_level"></a>
-
-
-<p>
-<p>Sets the logger level (for bboth system and client logging levels.)</p><p>Logger allows you to configure both system logging levels and client specific logging levels. If a client specific logging level is defined, it will override the system level configuration. If no client level is defined Logger will defautl to the system level configuration.</p><p>Prior to version 2.0.0 Logger only supported a &quot;global&quot; logger level. The primary goal of this approach was to enable Logger at <code>debug</code> level for development environments, then change it to <code>error</code> level in production environments so the logs did not slow down the system. Over time developers start to find that in some situations they needed to see what a particular user / session was doing in production. Their only option was to enable Logger for the entire system which could potentially slow everyone down.</p><p>Starting in version 2.0.0 you can now specify the logger level (along with call stack setting) by specifying the <code>client_identifier</code>. If not explicitly unset, client specific configurations will expire after a set period of time.</p><p>The following query shows all the current client specific log configurations:</p><pre><code class="lang-sql">select *
-from logger_prefs_by_client_id;
-
-CLIENT_ID     LOGGER_LEVEL  INCLUDE_CALL_STACK CREATED_DATE   EXPIRY_DATE
-------------------- ------------- ------------------ -------------------- --------------------
-logger_demo_session ERROR   TRUE         24-APR-2013 02:48:13 24-APR-2013 14:48:13
-</code></pre>
-
-</p>
-
-### Syntax
-```plsql
-procedure set_level(
-  p_level in varchar2 default logger.g_debug_name,
-  p_client_id in varchar2 default null,
-  p_include_call_stack in varchar2 default null,
-  p_client_id_expire_hours in number default null
-)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | Use <code>logger.g_&lt;level&gt;_name</code> constants. If the level is deprecated it will automatically be set to <code>debug</code>.
-`p_client_id` | Optional: If defined, will set the level for the given client identifier. If <code>null</code> will set global settings  In APEX the <code>client_identifier</code> is <code>:APP_USER || &#39;:&#39; || :APP_SESSION</code>
-`p_include_call_stack` | Optional: Only valid if <code>p_client_id</code> is defined. Valid values: <code>TRUE</code>, <code>FALSE</code>. If not set will use the default system pref in <code>logger_prefs</code>.
-`p_client_id_expire_hours` | Optiona: If <code>p_client_id</code> is defined , expire after number of hours. If not defined, will default to system preference <code>PREF_BY_CLIENT_ID_EXPIRE_HOURS</code>
- 
- 
-
-
-### Example
-```plsql
-
--- Set system level logging level:
-exec logger.set_level(logger.g_debug_name);
-
--- Client Specific Configuration:
--- In Oracle Session-1
-exec logger.set_level(logger.g_debug_name);
-
-exec logger.log('Session-1: this should show up');
-
-select id, logger_level, text, client_identifier, call_stack
-from logger_logs_5_min
-order by id;
-
-  ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
----- ------------ ----------------------------------- ----------------- ----------------------------
-  31         16 Session-1: this should show up              object      line  object
-
-exec logger.set_level (logger.g_error_name);
-
-exec logger.log('Session-1: this should NOT show up');
-
--- The previous line does not get logged since the logger level is set to ERROR and it made a .log call
-
-
--- In Oracle Session-2 (i.e. a different session)
-exec dbms_session.set_identifier('my_identifier');
-
--- This sets the logger level for current identifier
-exec logger.set_level(logger.g_debug_name, sys_context('userenv','client_identifier'));
-
-exec logger.log('Session-2: this should show up');
-
-select id, logger_level, text, client_identifier, call_stack
-from logger_logs_5_min
-order by id;
-
-  ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
----- ------------ ----------------------------------- ----------------- ----------------------------
-  31         16 Session-1: this should show up                  object      line  object
-  32         16 Session-2: this should show up    my_identifier   object      line  object
-
--- Notice how the CLIENT_IDENTIFIER field also contains the current client_identifer
--- In APEX the client_identifier is
-:APP_USER || ':' || :APP_SESSION
 ```
 
 
