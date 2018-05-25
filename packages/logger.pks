@@ -44,6 +44,7 @@ as
 
 
   -- CONSTANTS
+  -- TODO see the old API docs for breakdown of constants
   /**
   * @constant g_logger_version Version of Logger as a string (`major.minor.patch`)
   * @constant g_context_name Context Logger uses for storing attributes.

@@ -22,37 +22,29 @@
  
 - [LOG_PERMANENT Procedure](#log_permanent)
  
-- [CONVERT_LEVEL_CHAR_TO_NUM Function](#convert_level_char_to_num)
- 
-- [CONVERT_LEVEL_NUM_TO_CHAR Function](#convert_level_num_to_char)
- 
-- [OK_TO_LOG Function](#ok_to_log)
- 
-- [OK_TO_LOG-1 Function](#ok_to_log-1)
- 
-- [DATE_TEXT_FORMAT Function](#date_text_format)
- 
-- [GET_CGI_ENV Function](#get_cgi_env)
- 
 - [LOG_USERENV Procedure](#log_userenv)
  
 - [LOG_CGI_ENV Procedure](#log_cgi_env)
- 
-- [GET_CHARACTER_CODES Function](#get_character_codes)
  
 - [LOG_CHARACTER_CODES Procedure](#log_character_codes)
  
 - [LOG_APEX_ITEMS Procedure](#log_apex_items)
  
-- [TIME_START Procedure](#time_start)
+- [TOCHAR Function](#tochar)
  
-- [TIME_STOP Procedure](#time_stop)
+- [TOCHAR-1 Function](#tochar-1)
  
-- [TIME_STOP-1 Function](#time_stop-1)
+- [TOCHAR-2 Function](#tochar-2)
  
-- [TIME_STOP_SECONDS Function](#time_stop_seconds)
+- [TOCHAR-3 Function](#tochar-3)
  
-- [TIME_RESET Procedure](#time_reset)
+- [TOCHAR-4 Function](#tochar-4)
+ 
+- [TOCHAR-5 Function](#tochar-5)
+ 
+- [SPRINTF Function](#sprintf)
+ 
+- [GET_CGI_ENV Function](#get_cgi_env)
  
 - [GET_PREF Function](#get_pref)
  
@@ -68,23 +60,11 @@
  
 - [STATUS Procedure](#status)
  
-- [UNSET_CLIENT_LEVEL Procedure](#unset_client_level)
+- [CONVERT_LEVEL_CHAR_TO_NUM Function](#convert_level_char_to_num)
  
-- [UNSET_CLIENT_LEVEL-1 Procedure](#unset_client_level-1)
+- [DATE_TEXT_FORMAT Function](#date_text_format)
  
-- [UNSET_CLIENT_LEVEL_ALL Procedure](#unset_client_level_all)
- 
-- [TOCHAR Function](#tochar)
- 
-- [TOCHAR-1 Function](#tochar-1)
- 
-- [TOCHAR-2 Function](#tochar-2)
- 
-- [TOCHAR-3 Function](#tochar-3)
- 
-- [TOCHAR-4 Function](#tochar-4)
- 
-- [TOCHAR-5 Function](#tochar-5)
+- [GET_CHARACTER_CODES Function](#get_character_codes)
  
 - [APPEND_PARAM Procedure](#append_param)
  
@@ -100,9 +80,29 @@
  
 - [APPEND_PARAM-6 Procedure](#append_param-6)
  
+- [OK_TO_LOG Function](#ok_to_log)
+ 
+- [OK_TO_LOG-1 Function](#ok_to_log-1)
+ 
 - [INS_LOGGER_LOGS Procedure](#ins_logger_logs)
  
-- [SPRINTF Function](#sprintf)
+- [UNSET_CLIENT_LEVEL Procedure](#unset_client_level)
+ 
+- [UNSET_CLIENT_LEVEL-1 Procedure](#unset_client_level-1)
+ 
+- [UNSET_CLIENT_LEVEL_ALL Procedure](#unset_client_level_all)
+ 
+- [TIME_START Procedure](#time_start)
+ 
+- [TIME_STOP Procedure](#time_stop)
+ 
+- [TIME_STOP-1 Function](#time_stop-1)
+ 
+- [TIME_STOP_SECONDS Function](#time_stop_seconds)
+ 
+- [TIME_RESET Procedure](#time_reset)
+ 
+- [CONVERT_LEVEL_NUM_TO_CHAR Function](#convert_level_num_to_char)
 
 ## Types<a name="types"></a>
 
@@ -257,7 +257,7 @@ Name | Description
 
 
 <p>
-<p>Shortcut to <code>log_information</code></p>
+<p>Shortcut to <a href="#log_information"><code>log_information</code></a></p>
 </p>
 
 ### Syntax
@@ -288,7 +288,7 @@ Name | Description
 
 
 <p>
-<p>See <code>logger.log</code> documentation</p>
+<p>See <a href="#log"><code>logger.log</code></a> documentation</p>
 </p>
 
 ### Syntax
@@ -319,7 +319,7 @@ Name | Description
 
 
 <p>
-<p>Shortcut to <code>log_warning</code></p>
+<p>Shortcut to <a href="#log_warning"><code>log_warning</code></a></p>
 </p>
 
 ### Syntax
@@ -350,7 +350,7 @@ Name | Description
 
 
 <p>
-<p>See <code>logger.log</code> documentation</p>
+<p>See <a href="#log"><code>logger.log</code></a> documentation</p>
 </p>
 
 ### Syntax
@@ -381,7 +381,7 @@ Name | Description
 
 
 <p>
-<p>See <code>logger.log</code> documentation</p>
+<p>See <a href="#log"><code>logger.log</code></a> documentation</p>
 </p>
 
 ### Syntax
@@ -400,201 +400,6 @@ Name | Description
 `p_scope` | 
 `p_extra` | 
 `p_params` | 
- 
- 
-
-
-
-
-
- 
-## CONVERT_LEVEL_CHAR_TO_NUM Function<a name="convert_level_char_to_num"></a>
-
-
-<p>
-<p>Converts string names to text value</p><p>Changes</p><ul>
-<li>2.1.0: Start to use global variables and correct numbers</li>
-</ul>
-
-</p>
-
-### Syntax
-```plsql
-function convert_level_char_to_num(
-  p_level in varchar2) 
-  return number
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | String representation of level
-*return* | Returns the number representing the given level (string). &#x60;-1&#x60; if not found
- 
- 
-
-
-
-
-
- 
-## CONVERT_LEVEL_NUM_TO_CHAR Function<a name="convert_level_num_to_char"></a>
-
-
-<p>
-<p>Converts the logger level num to char format</p>
-</p>
-
-### Syntax
-```plsql
-function convert_level_num_to_char(
-  p_level in number)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | 
-*return* | Logger level string format. &#x60;null&#x60; if &#x60;p_level&#x60; not found
- 
- 
-
-
-
-
-
- 
-## OK_TO_LOG Function<a name="ok_to_log"></a>
-
-
-<p>
-<p>Determines if the statement can be stored in LOGGER_LOGS</p><p>Though Logger internally handles when a statement is stored in the <code>logger_logs</code> table there may be situations where you need to know if <code>logger</code> will log a statement before calling <code>logger</code>. This is useful when doing an expensive operation just to log the data.</p><p>A classic example is looping over an array for the sole purpose of logging the data. In this case, there&#39;s no reason why the code should perform the additional computations when logging is disabled for a certain level.</p><p><code>ok_to_log</code> will also factor in client specific logging settings.</p><p>Note: <code>ok_to_log</code> is not something that should be used frequently as all calls to <code>logger</code> run this command internally.<br />Note: <code>ok_to_log</code> should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok_to_log should not be used in the following way:</p>
-</p>
-
-### Syntax
-```plsql
-function ok_to_log(p_level in number)
-  return boolean
-  $if 1=1
-    and $$rac_lt_11_2
-    and not dbms_db_version.ver_le_10_2
-    and ($$no_op
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | Level (number)
-*return* | True of statement can be logged to LOGGER_LOGS
- 
- 
-
-
-### Example
-```plsql
-declare
-  type typ_array is table of number index by pls_integer;
-  l_array typ_array;
-begin
-  -- Load test data
-  for x in 1..100 loop
-    l_array(x) := x;
-  end loop;
-
-  -- Only log if logging is enabled
-  if logger.ok_to_log(logger.g_debug) then
-    for x in 1..l_array.count loop
-      logger.log(l_array(x));
-    end loop;
-  end if;
- end;
- /
-
--- ok_to_log should not be used for one-off log commands. 
--- This defeats the whole purpose of having the various log commands. 
--- For example ok_to_log should NOT be used in the following way:
-...
-if logger.ok_to_log(logger.g_debug) then
- logger.log('test');
-end if;
-...
-```
-
-
-
- 
-## OK_TO_LOG-1 Function<a name="ok_to_log-1"></a>
-
-
-<p>
-<p>See previous <code>ok_to_log</code> example</p>
-</p>
-
-### Syntax
-```plsql
-function ok_to_log(p_level in varchar2)
-  return boolean
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_level` | Level (Name)
-*return* | True of log statements for that level or below will be logged
- 
- 
-
-
-
-
-
- 
-## DATE_TEXT_FORMAT Function<a name="date_text_format"></a>
-
-
-<p>
-<p>Returns the time difference (in nicely formatted string) of p_date compared to now (sysdate).</p>
-</p>
-
-### Syntax
-```plsql
-function date_text_format (p_date in date)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_date` | 
-*return* | formatting string
- 
- 
-
-
-
-
-
- 
-## GET_CGI_ENV Function<a name="get_cgi_env"></a>
-
-
-<p>
-<p>Get list of CGI values as name/value padded string</p>
-</p>
-
-### Syntax
-```plsql
-function get_cgi_env(
-  p_show_null in boolean default false)
-  return clob
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_show_null` | If true will show CGI values even if they&#39;re null
-*return* | CGI values (clob)
  
  
 
@@ -713,52 +518,11 @@ REMOTE_ADDR                   : 192.168.1.7
 
 
  
-## GET_CHARACTER_CODES Function<a name="get_character_codes"></a>
-
-
-<p>
-<p>Debugging issues with a string that contains control characters such as carriage returns, line feeds and tabs that can be very difficult.<br />The sql <code>dump()</code> function is great for this, but the output is a bit hard to read as it outputs the character codes for each character.<br />You end up comparing the character code to an ascii table to figure out what it is. </p><p>This function and the procedure <code>log_character_codes</code> makes it easier as it lines up the characters in the original string under the corresponding character codes from dump.<br />Additionally, all tabs are replaced with <code>^</code> and all other control characters such as <code>carriage returns</code> and <code>line feeds</code> are replaced with <code>~</code>. </p>
-</p>
-
-### Syntax
-```plsql
-function get_character_codes(
-  p_string in varchar2,
-  p_show_common_codes in boolean default true)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_string` | String to retrieve character codes for.
-`p_show_common_codes` | Display legend of common character codes.
-*return* | String with character codes.
- 
- 
-
-
-### Example
-```plsql
-
-select logger.get_character_codes('Hello World'||chr(9)||'Foo'||chr(13)||chr(10)||'Bar') char_codes
-from dual;
-
-CHAR_CODES
-----------------------------------------------------------------------------------
-Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
-  72,101,108,108,111, 32, 87,111,114,108,100,  9, 70,111,111, 13, 10, 66, 97,114
-   H,  e,  l,  l,  o,   ,  W,  o,  r,  l,  d,  ^,  F,  o,  o,  ~,  ~,  B,  a,  r
-```
-
-
-
- 
 ## LOG_CHARACTER_CODES Procedure<a name="log_character_codes"></a>
 
 
 <p>
-<p>Logs character codes for given string. See <code>get_character_codes</code> for detailed information</p>
+<p>Logs character codes for given string. See <a href="#get_character_codes"><code>get_character_codes</code></a> for detailed information</p>
 </p>
 
 ### Syntax
@@ -849,25 +613,25 @@ ID      LOG_ID  APP_SESSION    ITEM_NAME                 ITEM_VALUE
 
 
  
-## TIME_START Procedure<a name="time_start"></a>
+## TOCHAR Function<a name="tochar"></a>
 
 
 <p>
-<p>Since all the timing procedures are tightly coupled, the following example will be used to cover all of them:</p>
+<p><code>tochar</code> will convert the value to a string (<code>varchar2</code>). It is useful when logging items such as booleans without having to explicitly convert them.</p><p>Note: <code>tochar</code> does not use the <code>no_op</code> conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).<br />Note: Need to call this tochar instead of to_char since there will be a conflict when calling it</p>
 </p>
 
 ### Syntax
 ```plsql
-procedure time_start(
-  p_unit in varchar2,
-  p_log_in_table in boolean default true)
+function tochar(
+  p_val in number)
+  return varchar2
 ```
 
 ### Parameters
 Name | Description
 --- | ---
-`p_unit` | Unique &quot;code&quot; to identify timer. Allows for nesting (see example)
-`p_log_in_table` | If true will log timer in <code>logger_logs</code>
+`p_value` | Value (in original data type)
+*return* | varchar2 String for p_value
  
  
 
@@ -875,88 +639,43 @@ Name | Description
 ### Example
 ```plsql
 
-declare
-    l_number number;
-begin
-    logger.time_reset;
-    logger.time_start('foo');
-    logger.time_start('bar');
-    for i in 1..500000 loop
-        l_number := power(i,15);
-        l_number := sqrt(1333);
-    end loop; --i
-    logger.time_stop('bar');
-    for i in 1..500000 loop
-        l_number := power(i,15);
-        l_number := sqrt(1333);
-    end loop; --i
-    logger.time_stop('foo');
-end;
-/
+select logger.tochar(sysdate)
+from dual;
 
-select text from logger_logs_5_min;
+LOGGER.TOCHAR(SYSDATE)
+-----------------------
+13-JUN-2014 21:20:34
 
-TEXT
----------------------------------
-START: foo
->  START: bar
->  STOP : bar - 1.000843 seconds
-STOP : foo - 2.015953 seconds
+
+-- In PL/SQL highlighting conversion from boolean to varchar2
+SQL> exec dbms_output.put_line(logger.tochar(true));
+TRUE
+
+PL/SQL procedure successfully completed.
 ```
 
 
 
  
-## TIME_STOP Procedure<a name="time_stop"></a>
+## TOCHAR-1 Function<a name="tochar-1"></a>
 
 
 <p>
-<p>Stops a timing event and logs in <code>logger_logs</code> using <code>level = logger.g_timing</code>.</p><p>See <code>time_start</code> for example</p>
+<p>See <a href="#tochar"><code>tochar (p_val number)</code></a></p>
 </p>
 
 ### Syntax
 ```plsql
-procedure time_stop(
-  p_unit in varchar2,
-  p_scope in varchar2 default null)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_unit` | Timer to stop
-`p_scope` | <code>scope</code> to store in <code>logger_logs</code>
- 
- 
-
-
-
-
-
- 
-## TIME_STOP-1 Function<a name="time_stop-1"></a>
-
-
-<p>
-<p>Similar to <code>time_stop</code> (above). This function will stop a timer.<br />Logging into <code>logger_logs</code> is configurable via <code>p_log_in_table</code>.<br />Returns the stop time string.</p><p>See <code>time_start</code> for example</p>
-</p>
-
-### Syntax
-```plsql
-function time_stop(
-  p_unit in varchar2,
-  p_scope in varchar2 default null,
-  p_log_in_table IN boolean default true)
+function tochar(
+  p_val in date)
   return varchar2
 ```
 
 ### Parameters
 Name | Description
 --- | ---
-`p_unit` | Timer to stop.
-`p_scope` | <code>scope</code> to log timer under.
-`p_log_in_table` | Store result in <code>logger_logs</code>
-*return* | Timer results
+`p_val` | Date
+*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS&#x60;)
  
  
 
@@ -965,30 +684,25 @@ Name | Description
 
 
  
-## TIME_STOP_SECONDS Function<a name="time_stop_seconds"></a>
+## TOCHAR-2 Function<a name="tochar-2"></a>
 
 
 <p>
-<p>See <code>time_stop</code>.<br />Only difference is that time is logged in seconds</p>
+<p>See <a href="#tochar"><code>tochar (p_val number)</code></a></p>
 </p>
 
 ### Syntax
 ```plsql
-function time_stop_seconds(
-  p_unit in varchar2,
-  p_scope in varchar2 default null,
-  p_log_in_table in boolean default true
-  )
-  return number
+function tochar(
+  p_val in timestamp)
+  return varchar2
 ```
 
 ### Parameters
 Name | Description
 --- | ---
-`p_unit` | 
-`p_scope` | 
-`p_log_in_table` | 
-*return* | Timer in seconds
+`p_val` | Timestamp
+*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF&#x60;)
  
  
 
@@ -997,18 +711,187 @@ Name | Description
 
 
  
-## TIME_RESET Procedure<a name="time_reset"></a>
+## TOCHAR-3 Function<a name="tochar-3"></a>
 
 
 <p>
-<p>Resets all timers</p><p>See <code>time_start</code> for example</p>
+<p>See <a href="#tochar"><code>tochar (p_val number)</code></a></p>
 </p>
 
 ### Syntax
 ```plsql
-procedure time_reset
+function tochar(
+  p_val in timestamp with time zone)
+  return varchar2
 ```
 
+### Parameters
+Name | Description
+--- | ---
+`p_val` | Timestamp with time zone
+*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF TZR&#x60;)
+ 
+ 
+
+
+
+
+
+ 
+## TOCHAR-4 Function<a name="tochar-4"></a>
+
+
+<p>
+<p>See <a href="#tochar"><code>tochar (p_val number)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+function tochar(
+  p_val in timestamp with local time zone)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_val` | Timestamp with local time zone
+*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF TZR&#x60;)
+ 
+ 
+
+
+
+
+
+ 
+## TOCHAR-5 Function<a name="tochar-5"></a>
+
+
+<p>
+<p>See <a href="#tochar"><code>tochar (p_val number)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+function tochar(
+  p_val in boolean)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_val` | Boolean
+*return* | String for p_val (&#x60;TRUE&#x60; or &#x60;FALSE&#x60;)
+ 
+ 
+
+
+
+
+
+ 
+## SPRINTF Function<a name="sprintf"></a>
+
+
+<p>
+<p><code>sprintf</code> is similar to the common procedure <code>printf</code> found in many programming languages. It replaces substitution strings for a given string. Substitution strings can be either <code>%s</code> or <code>%s&lt;n&gt;</code> where <code>&lt;n&gt;</code> is a number 1~10.</p><p>The following rules are used to handle substitution strings (in order):</p><ul>
+<li>Replaces <code>%s&lt;n&gt;</code> with <code>p_s&lt;n&gt;</code>, regardless of order that they appear in <code>p_str</code></li>
+<li>Occurrences of <code>%s</code> (no number) are replaced with <code>p_s1..p_s10</code> in order that they appear in <code>p_str</code></li>
+<li><code>%%</code> is escaped to <code>%</code></li>
+</ul>
+<p>Note: <code>sprintf</code> does not use the <code>no_op</code> conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).</p>
+</p>
+
+### Syntax
+```plsql
+function sprintf(
+  p_str in varchar2,
+  p_s1 in varchar2 default null,
+  p_s2 in varchar2 default null,
+  p_s3 in varchar2 default null,
+  p_s4 in varchar2 default null,
+  p_s5 in varchar2 default null,
+  p_s6 in varchar2 default null,
+  p_s7 in varchar2 default null,
+  p_s8 in varchar2 default null,
+  p_s9 in varchar2 default null,
+  p_s10 in varchar2 default null)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_str` | String to apply substitution strings to
+`p_s1` | Substitution strings (same for <code>2-10</code>)
+`p_s2` | 
+`p_s3` | 
+`p_s4` | 
+`p_s5` | 
+`p_s6` | 
+`p_s7` | 
+`p_s8` | 
+`p_s9` | 
+`p_s10` | 
+*return* | p_msg with strings replaced
+ 
+ 
+
+
+### Example
+```plsql
+
+select logger.sprintf('hello %s, how are you %s', 'martin', 'today') msg
+from dual;
+
+MSG
+-------------------------------
+hello martin, how are you today   
+
+-- Advance features
+
+-- Escaping %
+select logger.sprintf('hello, %% (escape) %s1', 'martin') msg
+from dual;
+
+MSG
+-------------------------
+hello, % (escape) martin
+
+-- %s<n> replacement
+select logger.sprintf('%s1, %s2, %s', 'one', 'two') msg
+from dual;
+
+MSG
+-------------------------
+one, two, one
+```
+
+
+
+ 
+## GET_CGI_ENV Function<a name="get_cgi_env"></a>
+
+
+<p>
+<p>Get list of CGI values as name/value padded string</p>
+</p>
+
+### Syntax
+```plsql
+function get_cgi_env(
+  p_show_null in boolean default false)
+  return clob
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_show_null` | If true will show CGI values even if they&#39;re null
+*return* | CGI values (clob)
+ 
  
 
 
@@ -1254,6 +1137,482 @@ PL/SQL procedure successfully completed.
 
 
  
+## CONVERT_LEVEL_CHAR_TO_NUM Function<a name="convert_level_char_to_num"></a>
+
+
+<p>
+<p>Converts string names to text value</p><p>Changes</p><ul>
+<li>2.1.0: Start to use global variables and correct numbers</li>
+</ul>
+
+</p>
+
+### Syntax
+```plsql
+function convert_level_char_to_num(
+  p_level in varchar2) 
+  return number
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | String representation of level
+*return* | Returns the number representing the given level (string). &#x60;-1&#x60; if not found
+ 
+ 
+
+
+
+
+
+ 
+## DATE_TEXT_FORMAT Function<a name="date_text_format"></a>
+
+
+<p>
+<p>Returns the time difference (in nicely formatted string) of p_date compared to now (sysdate).</p>
+</p>
+
+### Syntax
+```plsql
+function date_text_format (p_date in date)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_date` | 
+*return* | formatting string
+ 
+ 
+
+
+
+
+
+ 
+## GET_CHARACTER_CODES Function<a name="get_character_codes"></a>
+
+
+<p>
+<p>Debugging issues with a string that contains control characters such as carriage returns, line feeds and tabs that can be very difficult.<br />The sql <code>dump()</code> function is great for this, but the output is a bit hard to read as it outputs the character codes for each character.<br />You end up comparing the character code to an ascii table to figure out what it is. </p><p>This function and the procedure <code>log_character_codes</code> makes it easier as it lines up the characters in the original string under the corresponding character codes from dump.<br />Additionally, all tabs are replaced with <code>^</code> and all other control characters such as <code>carriage returns</code> and <code>line feeds</code> are replaced with <code>~</code>. </p>
+</p>
+
+### Syntax
+```plsql
+function get_character_codes(
+  p_string in varchar2,
+  p_show_common_codes in boolean default true)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_string` | String to retrieve character codes for.
+`p_show_common_codes` | Display legend of common character codes.
+*return* | String with character codes.
+ 
+ 
+
+
+### Example
+```plsql
+
+select logger.get_character_codes('Hello World'||chr(9)||'Foo'||chr(13)||chr(10)||'Bar') char_codes
+from dual;
+
+CHAR_CODES
+----------------------------------------------------------------------------------
+Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
+  72,101,108,108,111, 32, 87,111,114,108,100,  9, 70,111,111, 13, 10, 66, 97,114
+   H,  e,  l,  l,  o,   ,  W,  o,  r,  l,  d,  ^,  F,  o,  o,  ~,  ~,  B,  a,  r
+```
+
+
+
+ 
+## APPEND_PARAM Procedure<a name="append_param"></a>
+
+
+<p>
+<p>Logger has wrapper functions to quickly and easily log parameters. All primary <code>log</code> procedures take in a fourth parameter (<code>p_params</code>) to support logging a parameter array. The values are explicitly converted to strings so you don&#39;t need to convert them. The parameter values will be stored in the extra column.</p><p>Note: Append parameter to table of parameters<br />Note: Nothing is actually logged in this procedure</p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in varchar2
+)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | Table of parameters (param will be appended to this)
+`p_name` | Name of the parameter
+`p_val` | Value (in original data type / will be converted to string).
+ 
+ 
+
+
+### Example
+```plsql
+
+create or replace procedure p_demo_function(
+  p_empno in emp.empno%type,
+  p_ename in emp.ename%type)
+as
+  l_scope logger_logs.scope%type := 'p_demo_function';
+  l_params logger.tab_param;
+begin
+  logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
+  logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
+  logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point  
+  -- ...
+exception
+  when others then
+    logger.log_error('Unhandled Exception', l_scope, null, l_params);
+end p_demo_function;
+/
+```
+
+
+
+ 
+## APPEND_PARAM-1 Procedure<a name="append_param-1"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in number)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## APPEND_PARAM-2 Procedure<a name="append_param-2"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in date)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## APPEND_PARAM-3 Procedure<a name="append_param-3"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in timestamp)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## APPEND_PARAM-4 Procedure<a name="append_param-4"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in timestamp with time zone)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## APPEND_PARAM-5 Procedure<a name="append_param-5"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in timestamp with local time zone)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## APPEND_PARAM-6 Procedure<a name="append_param-6"></a>
+
+
+<p>
+<p>See <a href="#append_param"><code>append_param (varchar2)</code></a></p>
+</p>
+
+### Syntax
+```plsql
+procedure append_param(
+  p_params in out nocopy logger.tab_param,
+  p_name in varchar2,
+  p_val in boolean)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_params` | 
+`p_name` | 
+`p_val` | 
+ 
+ 
+
+
+
+
+
+ 
+## OK_TO_LOG Function<a name="ok_to_log"></a>
+
+
+<p>
+<p>Determines if the statement can be stored in LOGGER_LOGS</p><p>Though Logger internally handles when a statement is stored in the <code>logger_logs</code> table there may be situations where you need to know if <code>logger</code> will log a statement before calling <code>logger</code>. This is useful when doing an expensive operation just to log the data.</p><p>A classic example is looping over an array for the sole purpose of logging the data. In this case, there&#39;s no reason why the code should perform the additional computations when logging is disabled for a certain level.</p><p><code>ok_to_log</code> will also factor in client specific logging settings.</p><p>Note: <code>ok_to_log</code> is not something that should be used frequently as all calls to <code>logger</code> run this command internally.<br />Note: <code>ok_to_log</code> should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok_to_log should not be used in the following way:</p>
+</p>
+
+### Syntax
+```plsql
+function ok_to_log(p_level in number)
+  return boolean
+  $if 1=1
+    and $$rac_lt_11_2
+    and not dbms_db_version.ver_le_10_2
+    and ($$no_op
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | Level (number)
+*return* | True of statement can be logged to LOGGER_LOGS
+ 
+ 
+
+
+### Example
+```plsql
+declare
+  type typ_array is table of number index by pls_integer;
+  l_array typ_array;
+begin
+  -- Load test data
+  for x in 1..100 loop
+    l_array(x) := x;
+  end loop;
+
+  -- Only log if logging is enabled
+  if logger.ok_to_log(logger.g_debug) then
+    for x in 1..l_array.count loop
+      logger.log(l_array(x));
+    end loop;
+  end if;
+ end;
+ /
+
+-- ok_to_log should not be used for one-off log commands. 
+-- This defeats the whole purpose of having the various log commands. 
+-- For example ok_to_log should NOT be used in the following way:
+...
+if logger.ok_to_log(logger.g_debug) then
+ logger.log('test');
+end if;
+...
+```
+
+
+
+ 
+## OK_TO_LOG-1 Function<a name="ok_to_log-1"></a>
+
+
+<p>
+<p>See previous <code>ok_to_log</code> example</p>
+</p>
+
+### Syntax
+```plsql
+function ok_to_log(p_level in varchar2)
+  return boolean
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | Level (Name)
+*return* | True of log statements for that level or below will be logged
+ 
+ 
+
+
+
+
+
+ 
+## INS_LOGGER_LOGS Procedure<a name="ins_logger_logs"></a>
+
+
+<p>
+<p>Similar to <code>ok_to_log</code>, this procedure should be used very infrequently as the main Logger procedures should handle everything that is required for quickly logging information.</p><p>As part of the <code>2.1.0</code> release, the trigger on <code>logger_logs</code> was removed for both performance and other issues. Though inserting directly to the <code>logger_logs</code> table is not a supported feature of Logger, you may have some code that does a direct insert. The primary reason that a manual insert into <code>logger_logs</code> was done was to obtain the <code>id</code> column for the log entry.</p><p>To help prevent any issues with backwards compatibility, <code>ins_logger_logs</code> has been made publicly accessible to handle any inserts into <code>logger_logs</code>. This is a supported procedure and any manual insert statements will need to be modified to use this procedure instead.</p><p>In most situations you should <strong>not</strong> be calling this procedure and use the <code>logger.log</code> procedures instead</p><p>Important things to know about <code>ins_logger_logs</code>:</p><ul>
+<li>It does not check the Logger <code>level</code>. This means it will always insert into <code>logger_logs</code>. It is also an <code>autonomous transaction</code> procedure so a commit is always performed, however it will not affect the current session.</li>
+<li>Plugins will not be executed when calling this procedure. If you have critical processes which leverage plugin support you should use the proper <code>log</code> function instead.</li>
+</ul>
+
+</p>
+
+### Syntax
+```plsql
+procedure ins_logger_logs(
+  p_logger_level in logger_logs.logger_level%type,
+  p_text in varchar2 default null, -- Not using type since want to be able to pass in 32767 characters
+  p_scope in logger_logs.scope%type default null,
+  p_call_stack in logger_logs.call_stack%type default null,
+  p_unit_name in logger_logs.unit_name%type default null,
+  p_line_no in logger_logs.line_no%type default null,
+  p_extra in logger_logs.extra%type default null,
+  po_id out nocopy logger_logs.id%type
+  )
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_logger_level` | Logger level. See Constants section for list of variables to chose from.
+`p_text` | 
+`p_scope` | 
+`p_call_stack` | PL/SQL call stack
+`p_unit_name` | Unit name (this is usually the calling procedure)
+`p_line_no` | Line number
+`p_extra` | <code>clob</code>
+`po_id` | <code>id</code> entered into <code>logger_logs</code> for this record
+ 
+ 
+
+
+### Example
+```plsql
+
+set serveroutput on
+
+declare
+  l_id logger_logs.id%type;
+begin
+  -- Note: Commented out parameters not used for this demo (but still accessible via API)
+  logger.ins_logger_logs(
+    p_logger_level => logger.g_debug,
+    p_text => 'Custom Insert',
+    p_scope => 'demo.logger.custom_insert',
+--    p_call_stack => ''
+    p_unit_name => 'Dynamic PL/SQL',
+--    p_line_no => ,
+--    p_extra => ,
+    po_id => l_id
+  );
+
+  dbms_output.put_line('ID: ' || l_id);
+end;
+/
+
+ID: 2930650
+```
+
+
+
+ 
 ## UNSET_CLIENT_LEVEL Procedure<a name="unset_client_level"></a>
 
 
@@ -1336,555 +1695,196 @@ exec logger.unset_client_level_all;
 
 
  
-## TOCHAR Function<a name="tochar"></a>
+## TIME_START Procedure<a name="time_start"></a>
 
 
 <p>
-<p><code>tochar</code> will convert the value to a string (<code>varchar2</code>). It is useful when logging items such as booleans without having to explicitly convert them.</p><p>Note: <code>tochar</code> does not use the <code>no_op</code> conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).<br />Note: Need to call this tochar instead of to_char since there will be a conflict when calling it</p>
+<p>Since all the timing procedures are tightly coupled, the following example will be used to cover all of them:</p>
 </p>
 
 ### Syntax
 ```plsql
-function tochar(
-  p_val in number)
-  return varchar2
+procedure time_start(
+  p_unit in varchar2,
+  p_log_in_table in boolean default true)
 ```
 
 ### Parameters
 Name | Description
 --- | ---
-`p_value` | Value (in original data type)
-*return* | varchar2 String for p_value
+`p_unit` | Unique &quot;code&quot; to identify timer. Allows for nesting (see example)
+`p_log_in_table` | If true will log timer in <code>logger_logs</code>
  
  
 
 
 ### Example
 ```plsql
-
-select logger.tochar(sysdate)
-from dual;
-
-LOGGER.TOCHAR(SYSDATE)
------------------------
-13-JUN-2014 21:20:34
-
-
--- In PL/SQL highlighting conversion from boolean to varchar2
-SQL> exec dbms_output.put_line(logger.tochar(true));
-TRUE
-
-PL/SQL procedure successfully completed.
-```
-
-
-
- 
-## TOCHAR-1 Function<a name="tochar-1"></a>
-
-
-<p>
-<p>See <code>tochar (p_val number)</code></p>
-</p>
-
-### Syntax
-```plsql
-function tochar(
-  p_val in date)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_val` | Date
-*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS&#x60;)
- 
- 
-
-
-
-
-
- 
-## TOCHAR-2 Function<a name="tochar-2"></a>
-
-
-<p>
-<p>See <code>tochar (p_val number)</code></p>
-</p>
-
-### Syntax
-```plsql
-function tochar(
-  p_val in timestamp)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_val` | Timestamp
-*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF&#x60;)
- 
- 
-
-
-
-
-
- 
-## TOCHAR-3 Function<a name="tochar-3"></a>
-
-
-<p>
-<p>See <code>tochar (p_val number)</code></p>
-</p>
-
-### Syntax
-```plsql
-function tochar(
-  p_val in timestamp with time zone)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_val` | Timestamp with time zone
-*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF TZR&#x60;)
- 
- 
-
-
-
-
-
- 
-## TOCHAR-4 Function<a name="tochar-4"></a>
-
-
-<p>
-<p>See <code>tochar (p_val number)</code></p>
-</p>
-
-### Syntax
-```plsql
-function tochar(
-  p_val in timestamp with local time zone)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_val` | Timestamp with local time zone
-*return* | String for p_val (format &#x60;DD-MON-YYYY HH24:MI:SS:FF TZR&#x60;)
- 
- 
-
-
-
-
-
- 
-## TOCHAR-5 Function<a name="tochar-5"></a>
-
-
-<p>
-<p>See <code>tochar (p_val number)</code></p>
-</p>
-
-### Syntax
-```plsql
-function tochar(
-  p_val in boolean)
-  return varchar2
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_val` | Boolean
-*return* | String for p_val (&#x60;TRUE&#x60; or &#x60;FALSE&#x60;)
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM Procedure<a name="append_param"></a>
-
-
-<p>
-<p>Logger has wrapper functions to quickly and easily log parameters. All primary <code>log</code> procedures take in a fourth parameter (<code>p_params</code>) to support logging a parameter array. The values are explicitly converted to strings so you don&#39;t need to convert them. The parameter values will be stored in the extra column.</p><p>Note: Append parameter to table of parameters<br />Note: Nothing is actually logged in this procedure</p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in varchar2
-)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | Table of parameters (param will be appended to this)
-`p_name` | Name of the parameter
-`p_val` | Value (in original data type / will be converted to string).
- 
- 
-
-
-### Example
-```plsql
-
-create or replace procedure p_demo_function(
-  p_empno in emp.empno%type,
-  p_ename in emp.ename%type)
-as
-  l_scope logger_logs.scope%type := 'p_demo_function';
-  l_params logger.tab_param;
-begin
-  logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
-  logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
-  logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point  
-  -- ...
-exception
-  when others then
-    logger.log_error('Unhandled Exception', l_scope, null, l_params);
-end p_demo_function;
-/
-```
-
-
-
- 
-## APPEND_PARAM-1 Procedure<a name="append_param-1"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in number)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM-2 Procedure<a name="append_param-2"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in date)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM-3 Procedure<a name="append_param-3"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in timestamp)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM-4 Procedure<a name="append_param-4"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in timestamp with time zone)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM-5 Procedure<a name="append_param-5"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in timestamp with local time zone)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## APPEND_PARAM-6 Procedure<a name="append_param-6"></a>
-
-
-<p>
-<p>See <code>append_param (varchar2)</code></p>
-</p>
-
-### Syntax
-```plsql
-procedure append_param(
-  p_params in out nocopy logger.tab_param,
-  p_name in varchar2,
-  p_val in boolean)
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_params` | 
-`p_name` | 
-`p_val` | 
- 
- 
-
-
-
-
-
- 
-## INS_LOGGER_LOGS Procedure<a name="ins_logger_logs"></a>
-
-
-<p>
-<p>Similar to <code>ok_to_log</code>, this procedure should be used very infrequently as the main Logger procedures should handle everything that is required for quickly logging information.</p><p>As part of the <code>2.1.0</code> release, the trigger on <code>logger_logs</code> was removed for both performance and other issues. Though inserting directly to the <code>logger_logs</code> table is not a supported feature of Logger, you may have some code that does a direct insert. The primary reason that a manual insert into <code>logger_logs</code> was done was to obtain the <code>id</code> column for the log entry.</p><p>To help prevent any issues with backwards compatibility, <code>ins_logger_logs</code> has been made publicly accessible to handle any inserts into <code>logger_logs</code>. This is a supported procedure and any manual insert statements will need to be modified to use this procedure instead.</p><p>In most situations you should <strong>not</strong> be calling this procedure and use the <code>logger.log</code> procedures instead</p><p>Important things to know about <code>ins_logger_logs</code>:</p><ul>
-<li>It does not check the Logger <code>level</code>. This means it will always insert into <code>logger_logs</code>. It is also an <code>autonomous transaction</code> procedure so a commit is always performed, however it will not affect the current session.</li>
-<li>Plugins will not be executed when calling this procedure. If you have critical processes which leverage plugin support you should use the proper <code>log</code> function instead.</li>
-</ul>
-
-</p>
-
-### Syntax
-```plsql
-procedure ins_logger_logs(
-  p_logger_level in logger_logs.logger_level%type,
-  p_text in varchar2 default null, -- Not using type since want to be able to pass in 32767 characters
-  p_scope in logger_logs.scope%type default null,
-  p_call_stack in logger_logs.call_stack%type default null,
-  p_unit_name in logger_logs.unit_name%type default null,
-  p_line_no in logger_logs.line_no%type default null,
-  p_extra in logger_logs.extra%type default null,
-  po_id out nocopy logger_logs.id%type
-  )
-```
-
-### Parameters
-Name | Description
---- | ---
-`p_logger_level` | Logger level. See Constants section for list of variables to chose from.
-`p_text` | 
-`p_scope` | 
-`p_call_stack` | PL/SQL call stack
-`p_unit_name` | Unit name (this is usually the calling procedure)
-`p_line_no` | Line number
-`p_extra` | <code>clob</code>
-`po_id` | <code>id</code> entered into <code>logger_logs</code> for this record
- 
- 
-
-
-### Example
-```plsql
-
-set serveroutput on
 
 declare
-  l_id logger_logs.id%type;
+    l_number number;
 begin
-  -- Note: Commented out parameters not used for this demo (but still accessible via API)
-  logger.ins_logger_logs(
-    p_logger_level => logger.g_debug,
-    p_text => 'Custom Insert',
-    p_scope => 'demo.logger.custom_insert',
---    p_call_stack => ''
-    p_unit_name => 'Dynamic PL/SQL',
---    p_line_no => ,
---    p_extra => ,
-    po_id => l_id
-  );
-
-  dbms_output.put_line('ID: ' || l_id);
+    logger.time_reset;
+    logger.time_start('foo');
+    logger.time_start('bar');
+    for i in 1..500000 loop
+        l_number := power(i,15);
+        l_number := sqrt(1333);
+    end loop; --i
+    logger.time_stop('bar');
+    for i in 1..500000 loop
+        l_number := power(i,15);
+        l_number := sqrt(1333);
+    end loop; --i
+    logger.time_stop('foo');
 end;
 /
 
-ID: 2930650
+select text from logger_logs_5_min;
+
+TEXT
+---------------------------------
+START: foo
+>  START: bar
+>  STOP : bar - 1.000843 seconds
+STOP : foo - 2.015953 seconds
 ```
 
 
 
  
-## SPRINTF Function<a name="sprintf"></a>
+## TIME_STOP Procedure<a name="time_stop"></a>
 
 
 <p>
-<p><code>sprintf</code> is similar to the common procedure <code>printf</code> found in many programming languages. It replaces substitution strings for a given string. Substitution strings can be either <code>%s</code> or <code>%s&lt;n&gt;</code> where <code>&lt;n&gt;</code> is a number 1~10.</p><p>The following rules are used to handle substitution strings (in order):</p><ul>
-<li>Replaces <code>%s&lt;n&gt;</code> with <code>p_s&lt;n&gt;</code>, regardless of order that they appear in <code>p_str</code></li>
-<li>Occurrences of <code>%s</code> (no number) are replaced with <code>p_s1..p_s10</code> in order that they appear in <code>p_str</code></li>
-<li><code>%%</code> is escaped to <code>%</code></li>
-</ul>
-<p>Note: <code>sprintf</code> does not use the <code>no_op</code> conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).</p>
+<p>Stops a timing event and logs in <code>logger_logs</code> using <code>level = logger.g_timing</code>.</p><p>See <a href="#time_start"><code>time_start</code></a> for example</p>
 </p>
 
 ### Syntax
 ```plsql
-function sprintf(
-  p_str in varchar2,
-  p_s1 in varchar2 default null,
-  p_s2 in varchar2 default null,
-  p_s3 in varchar2 default null,
-  p_s4 in varchar2 default null,
-  p_s5 in varchar2 default null,
-  p_s6 in varchar2 default null,
-  p_s7 in varchar2 default null,
-  p_s8 in varchar2 default null,
-  p_s9 in varchar2 default null,
-  p_s10 in varchar2 default null)
+procedure time_stop(
+  p_unit in varchar2,
+  p_scope in varchar2 default null)
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_unit` | Timer to stop
+`p_scope` | <code>scope</code> to store in <code>logger_logs</code>
+ 
+ 
+
+
+
+
+
+ 
+## TIME_STOP-1 Function<a name="time_stop-1"></a>
+
+
+<p>
+<p>Similar to <a href="#time_stop"><code>time_stop</code></a> (above). This function will stop a timer.<br />Logging into <code>logger_logs</code> is configurable via <code>p_log_in_table</code>.<br />Returns the stop time string.</p><p>See <code>time_start</code> for example</p>
+</p>
+
+### Syntax
+```plsql
+function time_stop(
+  p_unit in varchar2,
+  p_scope in varchar2 default null,
+  p_log_in_table IN boolean default true)
   return varchar2
 ```
 
 ### Parameters
 Name | Description
 --- | ---
-`p_str` | String to apply substitution strings to
-`p_s1` | Substitution strings (same for <code>2-10</code>)
-`p_s2` | 
-`p_s3` | 
-`p_s4` | 
-`p_s5` | 
-`p_s6` | 
-`p_s7` | 
-`p_s8` | 
-`p_s9` | 
-`p_s10` | 
-*return* | p_msg with strings replaced
+`p_unit` | Timer to stop.
+`p_scope` | <code>scope</code> to log timer under.
+`p_log_in_table` | Store result in <code>logger_logs</code>
+*return* | Timer results
  
  
 
 
-### Example
+
+
+
+ 
+## TIME_STOP_SECONDS Function<a name="time_stop_seconds"></a>
+
+
+<p>
+<p>See <a href="#time_stop"><code>time_stop</code></a>.<br />Only difference is that time is logged in seconds</p>
+</p>
+
+### Syntax
 ```plsql
-
-select logger.sprintf('hello %s, how are you %s', 'martin', 'today') msg
-from dual;
-
-MSG
--------------------------------
-hello martin, how are you today   
-
--- Advance features
-
--- Escaping %
-select logger.sprintf('hello, %% (escape) %s1', 'martin') msg
-from dual;
-
-MSG
--------------------------
-hello, % (escape) martin
-
--- %s<n> replacement
-select logger.sprintf('%s1, %s2, %s', 'one', 'two') msg
-from dual;
-
-MSG
--------------------------
-one, two, one
+function time_stop_seconds(
+  p_unit in varchar2,
+  p_scope in varchar2 default null,
+  p_log_in_table in boolean default true
+  )
+  return number
 ```
+
+### Parameters
+Name | Description
+--- | ---
+`p_unit` | 
+`p_scope` | 
+`p_log_in_table` | 
+*return* | Timer in seconds
+ 
+ 
+
+
+
+
+
+ 
+## TIME_RESET Procedure<a name="time_reset"></a>
+
+
+<p>
+<p>Resets all timers</p><p>See <a href="#time_start"><code>time_start</code></a> for example</p>
+</p>
+
+### Syntax
+```plsql
+procedure time_reset
+```
+
+ 
+
+
+
+
+
+ 
+## CONVERT_LEVEL_NUM_TO_CHAR Function<a name="convert_level_num_to_char"></a>
+
+
+<p>
+<p>Converts the logger level num to char format</p>
+</p>
+
+### Syntax
+```plsql
+function convert_level_num_to_char(
+  p_level in number)
+  return varchar2
+```
+
+### Parameters
+Name | Description
+--- | ---
+`p_level` | 
+*return* | Logger level string format. &#x60;null&#x60; if &#x60;p_level&#x60; not found
+ 
+ 
+
+
 
 
 
