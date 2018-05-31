@@ -47,6 +47,9 @@ as
   -- TODO see the old API docs for breakdown of constants
   /**
   * @constant g_logger_version Version of Logger as a string (`major.minor.patch`)
+  * @constant g_logger_version_major Version (major) as number. Can be used for conditional compilation
+  * @constant g_logger_version_minor Version (minor) as number. Can be used for conditional compilation
+  * @constant g_logger_version_patch Version (patch) as number. Can be used for conditional compilation
   * @constant g_context_name Context Logger uses for storing attributes.
   *
   * @constant g_off Logger level `off`
@@ -75,7 +78,13 @@ as
   * @constant g_apex_item_type_app Only application level items
   * @constant g_apex_item_type_page Only page level items
   */
-	g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
+  -- Don't change any version numbers as build script will replace with right version number
+  -- #129 Don't mondify ANYTHING for the version information below as it's expect to be exactly as is
+	g_logger_version constant varchar2(10) := 'x.x.x'; 
+  g_logger_version_major constant pls_integer := 0;
+  g_logger_version_minor constant pls_integer := 0;
+  g_logger_version_patch constant pls_integer := 0;
+
 	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
 
   g_off constant number := 0;

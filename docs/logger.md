@@ -110,7 +110,7 @@
 
 Name | Code | Description
 --- | --- | ---
-rec_param | <pre>type rec_param is record(<br />  name varchar2(255),<br />  val varchar2(4000));</pre> | `name`/`val` pair
+rec_param | <pre>type rec_param is record(<br />  name varchar2(255),<br />  val varchar2(32767));</pre> | `name`/`val` pair
 tab_param | <pre>type tab_param is table of rec_param index by binary_integer;</pre> | Array of `rec_param`
 rec_logger_log | <pre>type rec_logger_log is record(<br />  id logger_logs.id%type,<br />  logger_level logger_logs.logger_level%type<br />);</pre> | See [Logger Plugins](TODO LinkPlugins.md)
 
@@ -120,26 +120,30 @@ rec_logger_log | <pre>type rec_logger_log is record(<br />  id logger_logs.id%ty
 
 Name | Code | Description
 --- | --- | ---
-g_logger_version | <pre>g_logger_version constant varchar2(10) := 'x.x.x';</pre> | Version of Logger as a string (&#x60;major.minor.patch&#x60;)
-g_off | <pre>  g_off constant number := 0;</pre> | Logger level &#x60;off&#x60;
-g_permanent | <pre>  g_permanent constant number := 1;</pre> | Logger level &#x60;permanent&#x60;
-g_error | <pre>g_error constant number := 2;</pre> | Logger level &#x60;error&#x60;
-g_warning | <pre>g_warning constant number := 4;</pre> | Logger level &#x60;warning&#x60;
-g_information | <pre>g_information constant number := 8;</pre> | Logger level &#x60;information&#x60;
-g_debug | <pre>  g_debug constant number := 16;</pre> | Logger level &#x60;debug&#x60;
-g_timing | <pre>g_timing constant number := 32;</pre> | Logger level &#x60;timing&#x60;
-g_sys_context | <pre>  g_sys_context constant number := 64;</pre> | Logger level &#x60;sys_context&#x60;
-g_apex | <pre>  g_apex constant number := 128;</pre> | Logger level &#x60;apex&#x60;
-g_off_name | <pre>  g_off_name constant varchar2(30) := 'OFF';</pre> | Logger level &#x60;off&#x60; (name)
-g_permanent_name | <pre>  g_permanent_name constant varchar2(30) := 'PERMANENT';</pre> | Logger level &#x60;permanent&#x60; (name)
-g_error_name | <pre>  g_error_name constant varchar2(30) := 'ERROR';</pre> | Logger level &#x60;error&#x60; (name)
-g_warning_name | <pre>  g_warning_name constant varchar2(30) := 'WARNING';</pre> | Logger level &#x60;warning&#x60; (name)
-g_information_name | <pre>  g_information_name constant varchar2(30) := 'INFORMATION';</pre> | Logger level &#x60;information&#x60; (name)
-g_debug_name | <pre>  g_debug_name constant varchar2(30) := 'DEBUG';</pre> | Logger level &#x60;debug&#x60; (name)
-g_timing_name | <pre>  g_timing_name constant varchar2(30) := 'TIMING';</pre> | Logger level &#x60;timing&#x60; (name)
-g_sys_context_name | <pre>  g_sys_context_name constant varchar2(30) := 'SYS_CONTEXT';</pre> | Logger level &#x60;sys_context&#x60; (name)
-g_apex_name | <pre>  g_apex_name constant varchar2(30) := 'APEX';</pre> | Logger level &#x60;apex&#x60; (name)
-g_apex_item_type_all | <pre>  g_apex_item_type_all constant varchar2(30) := 'ALL';</pre> | &#x60;log_apex_items&#x60; takes in an optional variable &#x60;p_item_scope&#x60;. This determines which items to log in APEX. Log both application and page level items
+g_logger_version | <pre>	g_logger_version constant varchar2(10) := 'x.x.x';</pre> | Version of Logger as a string (&#x60;major.minor.patch&#x60;)
+g_logger_version_major | <pre> <br />g_logger_version_major constant pls_integer :=     0;</pre> | Version (major) as number. Can be used for conditional compilation
+g_logger_version_minor | <pre>g_logger_version_minor constant pls_integer := 0;</pre> | Version (minor) as number. Can be used for conditional compilation
+g_logger_version_patch | <pre>g_logger_version_patch constant pls_integer := 0;</pre> | Version (patch) as number. Can be used for conditional compilation
+g_context_name | <pre>	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';</pre> | Context Logger uses for storing attributes.
+g_off | <pre>g_off constant number := 0;</pre> | Logger level &#x60;off&#x60;
+g_permanent | <pre>g_permanent constant number := 1;</pre> | Logger level &#x60;permanent&#x60;
+g_error | <pre>	g_error constant number := 2;</pre> | Logger level &#x60;error&#x60;
+g_warning | <pre>	g_warning constant number := 4;</pre> | Logger level &#x60;warning&#x60;
+g_information | <pre>	g_information constant number := 8;</pre> | Logger level &#x60;information&#x60;
+g_debug | <pre>g_debug constant number := 16;</pre> | Logger level &#x60;debug&#x60;
+g_timing | <pre>	g_timing constant number := 32;</pre> | Logger level &#x60;timing&#x60;
+g_sys_context | <pre>g_sys_context constant number := 64;</pre> | Logger level &#x60;sys_context&#x60;
+g_apex | <pre>g_apex constant number := 128;</pre> | Logger level &#x60;apex&#x60;
+g_off_name | <pre>g_off_name constant varchar2(30) := 'OFF';</pre> | Logger level &#x60;off&#x60; (name)
+g_permanent_name | <pre>g_permanent_name constant varchar2(30) := 'PERMANENT';</pre> | Logger level &#x60;permanent&#x60; (name)
+g_error_name | <pre>g_error_name constant varchar2(30) := 'ERROR';</pre> | Logger level &#x60;error&#x60; (name)
+g_warning_name | <pre>g_warning_name constant varchar2(30) := 'WARNING';</pre> | Logger level &#x60;warning&#x60; (name)
+g_information_name | <pre>g_information_name constant varchar2(30) := 'INFORMATION';</pre> | Logger level &#x60;information&#x60; (name)
+g_debug_name | <pre>g_debug_name constant varchar2(30) := 'DEBUG';</pre> | Logger level &#x60;debug&#x60; (name)
+g_timing_name | <pre>g_timing_name constant varchar2(30) := 'TIMING';</pre> | Logger level &#x60;timing&#x60; (name)
+g_sys_context_name | <pre>g_sys_context_name constant varchar2(30) := 'SYS_CONTEXT';</pre> | Logger level &#x60;sys_context&#x60; (name)
+g_apex_name | <pre>g_apex_name constant varchar2(30) := 'APEX';</pre> | Logger level &#x60;apex&#x60; (name)
+g_apex_item_type_all | <pre>g_apex_item_type_all constant varchar2(30) := 'ALL';</pre> | &#x60;log_apex_items&#x60; takes in an optional variable &#x60;p_item_scope&#x60;. This determines which items to log in APEX. Log both application and page level items
 
 
 

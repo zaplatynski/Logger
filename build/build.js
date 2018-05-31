@@ -85,6 +85,10 @@ fn.appendObjects(config.objects.postInstall, 'postInstall', true);
 // Replace any references for the version number
 let installContents = fn.fs.readFile(config.files.install);
 installContents = installContents.replace(/x\.x\.x/g, `${params.version.string}`);
+// #129 Change the individual version numbers
+installContents = installContents.replace(/(g_logger_version_major constant pls_integer :=)(\s*)(\d{1})/, `$1 ${params.version.major}`);
+installContents = installContents.replace(/(g_logger_version_minor constant pls_integer :=)(\s*)(\d{1})/, `$1 ${params.version.minor}`);
+installContents = installContents.replace(/(g_logger_version_patch constant pls_integer :=)(\s*)(\d{1})/, `$1 ${params.version.patch}`);
 fn.fs.writeFile(config.files.install, installContents);
 
 
