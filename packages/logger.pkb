@@ -79,6 +79,7 @@ as
   gc_pref_client_id_expire_hours constant logger_prefs.pref_name%type := 'PREF_BY_CLIENT_ID_EXPIRE_HOURS';
   gc_pref_logger_debug constant logger_prefs.pref_name%type := 'LOGGER_DEBUG';
   gc_pref_plugin_fn_error constant logger_prefs.pref_name%type := 'PLUGIN_FN_ERROR';
+  gc_pref_global_context_name constant logger_prefs.pref_name%type := 'GLOBAL_CONTEXT_NAME';
 
 
 
@@ -751,7 +752,7 @@ as
   end run_plugin;
 
 
-    /**
+  /**
    * @private
    * Store APEX items in logger_logs_apex_items
    *
@@ -823,6 +824,68 @@ as
     $end -- $$no_op
   end snapshot_apex_items;
 
+  /**
+   * @private
+   * Wrapper to determine if the level is a valid level
+   *
+   *
+   * @example
+   *
+   * declare
+   *   l_valid boolean;
+   * begin
+   *   -- Note: this won't actually work since it's private function
+   *   l_valid := logger.is_valid_level(p_level => logger.g_error_name);
+   * end;
+   * /
+   *
+   * @issue #184 Initial ticket.
+   *
+   * @author Martin D'Souza
+   * @created 30-May-2018
+   * @param p_level
+   * @return True of level is valid
+   */
+  function is_valid_level(
+    p_level in varchar2)
+    return boolean
+  as
+  begin
+    return p_level in (g_off_name, g_permanent_name, g_error_name, g_warning_name, g_information_name, g_debug_name, g_timing_name, g_sys_context_name, g_apex_name);
+  end is_valid_level;
+
+  /**
+   * @private
+   * Returns all level names as a string
+   *
+   *
+   * @example
+   *
+   *
+   * @issue #184 Initial ticket.
+   *
+   * @author Martin D'Souza
+   * @created 30-May-2018
+   * @param p_delimiter delimeter for values
+   * @return list of levels delimited by p_delimiter
+   */
+  function get_all_level_names(
+    p_delimiter in varchar2 default ', ')
+    return varchar2
+  as
+  begin
+    return
+      g_off_name || p_delimiter ||
+      g_permanent_name || p_delimiter ||
+      g_error_name || p_delimiter ||
+      g_warning_name || p_delimiter ||
+      g_information_name || p_delimiter ||
+      g_debug_name || p_delimiter ||
+      g_timing_name || p_delimiter ||
+      g_sys_context_name || p_delimiter ||
+      g_apex_name;
+  end get_all_level_names;
+
 
   -- **** PUBLIC BUT NOT DOCUMENTED ****
 
@@ -845,8 +908,7 @@ as
     $if $$no_op or $$rac_lt_11_2 $then
       null;
     $else
-      dbms_session.clear_all_context(
-         namespace => g_context_name);
+      dbms_session.clear_all_context(namespace => g_context_name);
     $end
 
     commit;
@@ -1786,7 +1848,7 @@ as
       return null;
     $else
       $if $$logger_debug $then
-        dbms_output.put_line(l_scope || ' select pref');
+        dbms_output.put_line(l_scope || '| p_pref_type: ' || p_pref_type || ' p_pref_name: ' || p_pref_name);
       $end
 
       l_client_id := sys_context('userenv','client_identifier');
@@ -1834,7 +1896,9 @@ as
   end get_pref;
 
   /**
-   * Sets a preference.
+   * Sets a preference both custom and application (`LOGGER`) based preferences.
+   *
+   * For application sttings use `p_pref_type => 'LOGGER'.
    *
    * In some cases you may want to store custom preferences in the `logger_prefs` table. A use case for this would be when creating a plugin that needs to reference some parameters.
    *
@@ -1842,12 +1906,10 @@ as
    *
    * `set_pref` will either create or udpate a value. Values must contain data. If not, use DEL_PREF to delete unused preferences.
    *
-   * Notes: Does not support setting system preferences
-   *
    * @example
    *
    * exec logger.set_pref(
-   *   p_pref_type => 'CUSTOM'
+   *   p_pref_type => 'CUSTOM',
    *   p_pref_name => 'MY_PREF',
    *   p_pref_value => 'some value');
    *
@@ -1866,14 +1928,75 @@ as
   as
     l_pref_type logger_prefs.pref_type%type := trim(upper(p_pref_type));
     l_pref_name logger_prefs.pref_name%type := trim(upper(p_pref_name));
+
+    l_err_msg varchar2(4000);
   begin
 
     $if $$no_op $then
       null;
     $else
       if l_pref_type = logger.g_pref_type_logger then
-        raise_application_error(-20001, 'Can not set ' || l_pref_type || '. Reserved for Logger');
-      end if;
+        -- TODO mdsouza: modify trigger to prevent any LOGGER pref DMLs not from this function
+        -- TODO mdsouza: test this function out
+        -- #184 Need a way to set some Logger Prefs
+        -- To help simplify things will allow some calls to go thru / filter values here so one place to set values
+
+        -- Validate LOGGER inputs
+        if p_pref_value is null then
+          l_err_msg := 'must have a value';
+        elsif l_pref_name not in (
+          gc_pref_level,
+          gc_pref_include_call_stack,
+          gc_pref_protect_admin_procs,
+          gc_pref_install_schema,
+          gc_pref_purge_after_days,
+          gc_pref_purge_min_level,
+          gc_pref_logger_version,
+          gc_pref_client_id_expire_hours,
+          gc_pref_logger_debug,
+          gc_pref_plugin_fn_error,
+          gc_pref_global_context_name
+        ) then
+          l_err_msg := 'unknown LOGGER preference';
+        elsif 1=1
+          and l_pref_name in (gc_pref_logger_debug, gc_pref_include_call_stack, gc_pref_protect_admin_procs) 
+          and p_pref_value not in ('TRUE', 'FALSE') then
+          l_err_msg := 'must be TRUE or FALSE';
+        elsif l_pref_name in (gc_pref_client_id_expire_hours, gc_pref_purge_after_days) and not is_number(p_pref_value) then
+          l_err_msg := 'must be a number';
+        elsif l_pref_name in (gc_pref_purge_min_level, gc_pref_level) and not is_valid_level(p_level => p_pref_value) then
+          l_err_msg := 'must be one of the following values: ' || get_all_level_names;
+        elsif l_pref_name in (gc_pref_install_schema, gc_pref_logger_version, gc_pref_global_context_name) then
+          l_err_msg := 'can not change this value';
+        elsif 1=1
+          and l_pref_name = gc_pref_plugin_fn_error 
+          -- Ensure valid packge.function name
+          and (1=2
+            or p_pref_value != 'NONE'
+            or not regexp_like(p_pref_value, '^(([[:digit:]]|[[:lower:]]|_)+\.)?([[:digit:]]|[[:lower:]]|_)+$', 'i')
+           ) then
+          l_err_msg := 'invalid method name. Should be package.function name or use NONE';
+        end if;
+
+        if l_err_msg is not null then
+          raise_application_error(-20001, logger.sprintf('Preference LOGGER.%s1: %s2', p_pref_name, l_err_msg));
+        end if;
+
+        -- Validations should have passed at this point
+        -- Need to handle special preference settings
+        -- After each call to special preference go to end of method (if applicable) as don't want to update logger_prefs from here
+        if l_pref_name = gc_pref_level then
+          logger.set_level(p_level => p_pref_value);
+          goto end_method;
+        elsif l_pref_name = gc_pref_include_call_stack then
+          save_global_context(
+            p_attribute => gc_ctx_attr_include_call_stack,
+            p_value => p_pref_value,
+            p_client_id => null); -- Set global context
+          -- Don't go to end as we need to update the prefs table
+        end if;
+
+      end if; -- l_pref_type = logger.g_pref_type_logger
 
       merge into logger_prefs p
       using (select l_pref_type pref_type, l_pref_name pref_name, p_pref_value pref_value
@@ -1889,6 +2012,9 @@ as
       values
         (args.pref_type, args.pref_name ,args.pref_value);
     $end -- $no_op
+
+    <<end_method>>
+    null;
 
   end set_pref;
 
@@ -2543,7 +2669,7 @@ as
     $else
 
       $if $$logger_debug $then
-        dbms_output.put_line(l_scope || ': in function');
+        dbms_output.put_line(l_scope || ': START');
       $end
 
       $if $$rac_lt_11_2 $then
@@ -2553,6 +2679,9 @@ as
         l_level := get_level_number;
       $else
         l_level := sys_context(g_context_name,gc_ctx_attr_level);
+        $if $$logger_debug $then
+          dbms_output.put_line(l_scope || ': l_level (from context): ' || l_level);
+        $end
 
         if l_level is null then
           $if $$logger_debug $then
@@ -2561,6 +2690,7 @@ as
 
           l_level := get_level_number;
 
+          -- TODO mdsouza: bug:??? Should only user p_client_id if the current value is found in the client_prefs table
           save_global_context(
             p_attribute => gc_ctx_attr_level,
             p_value => l_level,
@@ -2841,11 +2971,9 @@ as
       l_include_call_stack := nvl(trim(upper(p_include_call_stack)), get_pref(logger.gc_pref_include_call_stack));
 
       assert(
-          l_level in (g_off_name, g_permanent_name, g_error_name, g_warning_name, g_information_name, g_debug_name, g_timing_name, g_sys_context_name, g_apex_name),
-        '"LEVEL" must be one of the following values: ' ||
-          g_off_name || ', ' || g_permanent_name || ', ' || g_error_name || ', ' || g_warning_name || ', ' ||
-          g_information_name || ', ' || g_debug_name || ', ' || g_timing_name || ', ' ||
-          g_sys_context_name || ', ' || g_apex_name );
+        is_valid_level(p_level => l_level),
+        '"LEVEL" must be one of the following values: ' || get_all_level_names(p_delimiter => ', ')
+        );
       assert(l_include_call_stack in ('TRUE', 'FALSE'), 'l_include_call_stack must be TRUE or FALSE');
 
       -- #60 Allow security check to be bypassed for client specific logging level
@@ -2915,6 +3043,7 @@ as
 
       end if; -- p_client_id is not null or admin_security_check
     $end
+
     commit;
   end set_level;
 
