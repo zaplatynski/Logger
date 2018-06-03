@@ -62,6 +62,12 @@ begin
   $if $$logger_no_op_install $then
     null;
   $else
+
+    -- #184 this table should only be updated by logger_prefs
+    if not logger.g_can_update_logger_prefs then
+      raise_application_error(-20001, 'Can not update logger_prefs from SQL. Use logger.set_pref instead');
+    end if;
+
     :new.pref_name := upper(:new.pref_name);
     :new.pref_type := upper(:new.pref_type);
 

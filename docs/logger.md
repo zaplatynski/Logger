@@ -121,7 +121,7 @@ rec_logger_log | <pre>type rec_logger_log is record(<br />  id logger_logs.id%ty
 Name | Code | Description
 --- | --- | ---
 g_logger_version | <pre>	g_logger_version constant varchar2(10) := 'x.x.x';</pre> | Version of Logger as a string (&#x60;major.minor.patch&#x60;)
-g_logger_version_major | <pre> <br />g_logger_version_major constant pls_integer :=     0;</pre> | Version (major) as number. Can be used for conditional compilation
+g_logger_version_major | <pre> <br />g_logger_version_major constant pls_integer := 0;</pre> | Version (major) as number. Can be used for conditional compilation
 g_logger_version_minor | <pre>g_logger_version_minor constant pls_integer := 0;</pre> | Version (minor) as number. Can be used for conditional compilation
 g_logger_version_patch | <pre>g_logger_version_patch constant pls_integer := 0;</pre> | Version (patch) as number. Can be used for conditional compilation
 g_context_name | <pre>	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';</pre> | Context Logger uses for storing attributes.
@@ -953,7 +953,7 @@ dbms_output.put_line('Logger level: ' || logger.get_pref('LEVEL'));
 
 
 <p>
-<p>Sets a preference.</p><p>In some cases you may want to store custom preferences in the <code>logger_prefs</code> table. A use case for this would be when creating a plugin that needs to reference some parameters.</p><p>This procedure allows you to leverage the <code>logger_prefs</code> table to store your custom preferences. To avoid any naming conflicts with Logger, you must use a type (defined in <code>p_pref_type</code>). You can not use the type <code>LOGGER</code> as it is reserved for Logger system preferences.</p><p><code>set_pref</code> will either create or udpate a value. Values must contain data. If not, use DEL_PREF to delete unused preferences.</p><p>Notes: Does not support setting system preferences</p>
+<p>Sets a preference both custom and application (<code>LOGGER</code>) based preferences.</p><p>For application sttings use `p_pref_type =&gt; &#39;LOGGER&#39;.</p><p>In some cases you may want to store custom preferences in the <code>logger_prefs</code> table. A use case for this would be when creating a plugin that needs to reference some parameters.</p><p>This procedure allows you to leverage the <code>logger_prefs</code> table to store your custom preferences. To avoid any naming conflicts with Logger, you must use a type (defined in <code>p_pref_type</code>). You can not use the type <code>LOGGER</code> as it is reserved for Logger system preferences.</p><p><code>set_pref</code> will either create or udpate a value. Values must contain data. If not, use DEL_PREF to delete unused preferences.</p>
 </p>
 
 ### Syntax
@@ -978,7 +978,7 @@ Name | Description
 ```plsql
 
 exec logger.set_pref(
-  p_pref_type => 'CUSTOM'
+  p_pref_type => 'CUSTOM',
   p_pref_name => 'MY_PREF',
   p_pref_value => 'some value');
 ```

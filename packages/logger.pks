@@ -120,6 +120,13 @@ as
   -- Note to developers: This is only for internal Logger code. Do not use this as part of your code.
   g_pref_type_logger constant logger_prefs.pref_type%type := 'LOGGER'; -- If this changes need to modify logger_prefs.sql as it has a dependancy.
 
+
+  -- #184 Determines if setting logger_prefs from Logger rather than a SQL statement
+  -- This is NOT a documented variable and should not be used by other applications
+  -- Storing in pks as no use protecting it internally since anyone can disable the trigger if they want
+  -- This is not fool proof but should help encourage people not to set logger_prefs via SQL
+  g_can_update_logger_prefs boolean := false;
+
   -- Expose private functions only for testing during development
   $if $$logger_debug $then
     function is_number(p_str in varchar2)

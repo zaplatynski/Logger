@@ -29,9 +29,6 @@ as
   --  $$LOGGER_PLUGIN_ERROR
   --
 
--- TODO mdsouza: Order of functions so they appear in documentaiton correctly
-
-
   -- TYPES
   type ts_array is table of timestamp index by varchar2(100);
 
@@ -45,10 +42,6 @@ as
   g_plug_logger_log_error rec_logger_log;
 
   g_in_plugin_error boolean := false;
-
-
-
-
 
 
   -- CONSTANTS
@@ -1935,9 +1928,9 @@ as
     $if $$no_op $then
       null;
     $else
+      logger.g_can_update_logger_prefs := true;
+
       if l_pref_type = logger.g_pref_type_logger then
-        -- TODO mdsouza: modify trigger to prevent any LOGGER pref DMLs not from this function
-        -- TODO mdsouza: test this function out
         -- #184 Need a way to set some Logger Prefs
         -- To help simplify things will allow some calls to go thru / filter values here so one place to set values
 
@@ -1978,9 +1971,7 @@ as
           l_err_msg := 'invalid method name. Should be package.function name or use NONE';
         end if;
 
-        if l_err_msg is not null then
-          raise_application_error(-20001, logger.sprintf('Preference LOGGER.%s1: %s2', p_pref_name, l_err_msg));
-        end if;
+        assert(l_err_msg is null, logger.sprintf('Preference LOGGER.%s1: %s2', p_pref_name, l_err_msg));
 
         -- Validations should have passed at this point
         -- Need to handle special preference settings
@@ -2011,11 +2002,15 @@ as
         insert (pref_type, pref_name ,pref_value)
       values
         (args.pref_type, args.pref_name ,args.pref_value);
+
+      <<end_method>>
+      logger.g_can_update_logger_prefs := false;
     $end -- $no_op
 
-    <<end_method>>
-    null;
-
+  exception
+    when others then
+      logger.g_can_update_logger_prefs := false;
+      raise;
   end set_pref;
 
 
@@ -3017,11 +3012,13 @@ as
 
         else
           -- Global settings
+          logger.g_can_update_logger_prefs := true;
           update logger_prefs
           set pref_value = l_level
           where 1=1
             and pref_type = logger.g_pref_type_logger
             and pref_name = logger.gc_pref_level;
+          logger.g_can_update_logger_prefs := false;
         end if;
 
         -- #110 Need to reset all contexts so that level is reset for sessions where client_identifier is defined
