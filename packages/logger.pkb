@@ -381,7 +381,7 @@ as
           l_return := true;
         else
           l_return := false;
-          raise_application_error (-20000, 'You are not authorized to call this procedure. Change Logger pref: PROTECT_ADMIN_PROCS to false to avoid this.');
+          raise_application_error (-20000, 'You are not authorized to call this procedure. Change Logger pref: PROTECT_ADMIN_PROCS to FALSE to avoid this.');
         end if;
       else
         l_return := true;
