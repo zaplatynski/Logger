@@ -67,7 +67,7 @@ objects.preInstall = [
 objects.procedures = [
   {
     name: 'logger_configure',
-    src: '../procedures/logger_configure.plb'
+    src: '../procedures/logger_configure.pkb'
   }
 ];
 
