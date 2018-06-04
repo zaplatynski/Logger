@@ -169,8 +169,7 @@ as
       return l_return;
     $end
   end get_param_clob;
-
-
+  
 
   /**
    * @private
@@ -200,6 +199,17 @@ as
     $end
 
     commit; -- MD: moved commit to outside of the NO_OP check since commit or rollback must occur in this procedure
+  exception
+    when others then
+      -- #128 Error ORA-01031: insufficient privileges will be raised when the context is missing
+      -- This usually happens whent the schema has been copied or database replicated
+      if sqlcode = -01031 then
+        raise_application_error(-20001, logger.sprintf(q'!
+Context %s1 is missing (usually due to cloned shema or database). 
+Run: "create or replace context %s1 using logger accessed globally;" to recreate it
+See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
+          logger.g_context_name));
+      end if;  
   end save_global_context;
 
 
