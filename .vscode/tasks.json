@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "compile: oos-logger",
+      "label": "oos-logger: compile file",
       "type": "shell",
       // Run sqlplus via a batch file
       "windows": {
@@ -50,7 +50,7 @@
       }
     },
     {
-      "label": "build: oos-logger: 3.2.0",
+      "label": "oos-logger: build-3.2.0",
       "type": "shell",
       // Run sqlplus via a batch file
       "osx": {
@@ -63,6 +63,98 @@
       // second argument is the file to execute (ie the current file)
       "args": [
         "3.2.0"
+      ],
+      "group": "build",
+      // do not switch to the output pane automatically
+      "presentation": {
+        "reveal": "always", // always, never, silent
+        "panel": "dedicated" // shared, dedicated, new
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "oos-logger: install",
+      "type": "shell",
+      // Run sqlplus via a batch file
+      "osx": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
+      // second argument is the file to execute (ie the current file)
+      "args": [
+        "ignore", //Leave blank
+        "@install/logger_install.sql",
+        "${fileBasename}"
+      ],
+      "group": "build",
+      // do not switch to the output pane automatically
+      "presentation": {
+        "reveal": "always", // always, never, silent
+        "panel": "dedicated" // shared, dedicated, new
+      },
+      "problemMatcher": {
+        "owner": "plsql",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}/install/logger_install.sql"
+        ],
+        "pattern": {
+          "regexp": "^([A-Z0-9]{3}-)(\\d+)(: )(.*)$",
+          "file": 0,
+          "code": 2,
+          "message": 4
+        }
+      }
+    },
+    {
+      "label": "oos-logger: uninstall",
+      "type": "shell",
+      // Run sqlplus via a batch file
+      "osx": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
+      // second argument is the file to execute (ie the current file)
+      "args": [
+        "ignore", //Leave blank
+        "@install/logger_uninstall.sql",
+        "${fileBasename}"
+      ],
+      "group": "build",
+      // do not switch to the output pane automatically
+      "presentation": {
+        "reveal": "always", // always, never, silent
+        "panel": "dedicated" // shared, dedicated, new
+      },
+      // use this to get any database errors (from user_errors view) listed in the "Problems" pane in VS Code
+      "problemMatcher": {
+        "owner": "plsql",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}/install/logger_uninstall.sql"
+        ],
+        "pattern": 
+          {
+            "regexp": "^([A-Z0-9]{3}-)(\\d+)(: )(.*)$",
+            "file": 0,
+            "code": 2,
+            "message": 4
+        }
+      }
+    },
+    {
+      "label": "oos-logger: logger_configure",
+      "type": "shell",
+      // Run sqlplus via a batch file
+      "osx": {
+        "command": ".vscode/scripts/_run_sqlplus.sh"
+      },
+      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
+      // second argument is the file to execute (ie the current file)
+      "args": [
+        "ignore", //Leave blank
+        "@.vscode/scripts/logger_configure.sql",
+        "${fileBasename}"
       ],
       "group": "build",
       // do not switch to the output pane automatically
