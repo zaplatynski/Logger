@@ -150,7 +150,9 @@ begin
       -- #46
       select 'PLUGIN_FN_ERROR' pref_name, 'NONE' pref_value from dual union
       -- #64
-      select 'LOGGER_DEBUG' pref_name, 'FALSE' pref_value from dual
+      select 'LOGGER_DEBUG' pref_name, 'FALSE' pref_value from dual union
+      -- #82: By default if we can't create a context we wont
+      select 'GLOBAL_CONTEXT_NAME' pref_name, 'NONE' pref_value from dual
       ) d
       on (p.pref_name = d.pref_name)
     when matched then

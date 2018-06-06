@@ -159,10 +159,23 @@ as
       return boolean;
 
     function get_level_number
-      return number;
+      return number
+      $if $$rac_lt_11_2 or not $$logger_context $then  -- TODO mdsouza: I think we can remove this as all we care about is db_version
+        $if not dbms_db_version.ver_le_10_2 $then
+          result_cache
+        $end
+      $end
+    ;
 
     function include_call_stack
-      return boolean;
+      return boolean
+      $if 1=1
+        and ($$rac_lt_11_2 or not $$logger_context)
+        and not dbms_db_version.ver_le_10_2
+        and ($$no_op is null or not $$no_op) $then
+          result_cache
+      $end
+      ;
 
     function date_text_format_base (
       p_date_start in date,
@@ -374,7 +387,14 @@ as
     p_val in boolean);
 
   function ok_to_log(p_level in number)
-    return boolean;
+    return boolean
+    $if 1=1
+      and ($$rac_lt_11_2 or not $$logger_context)
+      and not dbms_db_version.ver_le_10_2
+      and ($$no_op is null or not $$no_op) $then
+        result_cache
+    $end
+    ;
 
   function ok_to_log(p_level in varchar2)
     return boolean;

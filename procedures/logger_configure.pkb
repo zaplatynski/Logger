@@ -109,8 +109,7 @@ begin
   if upper(l_pref_value) = 'TRUE' then
     l_logger_debug := true;
   end if;
-
-
+  
   -- #46
   -- Handle plugin settings
 -- Set for each plugin type
@@ -128,6 +127,15 @@ begin
     l_variables := l_variables || x.var;
   end loop;
 
+  -- #82: Determine if we have a context set
+  select decode(lp.pref_value, 'NONE', 'FALSE', 'TRUE')
+  into l_pref_value
+  from logger_prefs lp
+  where 1=1
+		and lp.pref_type = upper(l_pref_type_logger)
+    and lp.pref_name = 'GLOBAL_CONTEXT_NAME';
+  l_variables := l_variables || 'LOGGER_CONTEXT:' || l_pref_value||',';
+
 
   l_variables := rtrim(l_variables,',');
   if l_logger_debug then
@@ -136,6 +144,8 @@ begin
 
 
 	-- Recompile Logger
+  -- #82: Need to recompile spec and body
+ 	l_sql := q'!alter package logger compile PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
  	l_sql := q'!alter package logger compile body PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
 	l_sql := replace(l_sql, '%VARIABLES%', l_variables);
 	execute immediate l_sql;

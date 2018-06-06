@@ -28,6 +28,9 @@ as
   --  Introduced with #46
   --  $$LOGGER_PLUGIN_ERROR
   --
+  -- $$LOGGER_CONTEXT
+  -- #82
+  -- If true, context is used for values preferences. False we read from table each time
 
   -- TYPES
   type ts_array is table of timestamp index by varchar2(100);
@@ -169,7 +172,7 @@ as
       return l_return;
     $end
   end get_param_clob;
-  
+
 
   /**
    * @private
@@ -414,7 +417,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    */
   function get_level_number
     return number
-    $if $$rac_lt_11_2 $then
+    $if $$rac_lt_11_2 or not $$logger_context $then  -- TODO mdsouza: I think we can remove this as all we care about is db_version
       $if not dbms_db_version.ver_le_10_2 $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
       $end
@@ -451,7 +454,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   function include_call_stack
     return boolean
     $if 1=1
-      and $$rac_lt_11_2
+      and ($$rac_lt_11_2 or not $$logger_context)
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
@@ -462,7 +465,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
     $if $$no_op $then
       return false;
     $else
-      $if $$rac_lt_11_2 $then
+      $if $$rac_lt_11_2 or not $$logger_context $then
         l_call_stack_pref := get_pref(logger.gc_pref_include_call_stack);
       $else
         l_call_stack_pref := sys_context(g_context_name,gc_ctx_attr_include_call_stack);
@@ -908,7 +911,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   is
     pragma autonomous_transaction;
   begin
-    $if $$no_op or $$rac_lt_11_2 $then
+    $if $$no_op or $$rac_lt_11_2 or not $$logger_context $then
       null;
     $else
       dbms_session.clear_all_context(namespace => g_context_name);
@@ -1888,6 +1891,10 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
         )
       )
       where rn = 1;
+
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ':' || l_pref_value);
+      $end
       return l_pref_value;
     $end
 
@@ -2256,6 +2263,12 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
       display_output('Pref by client_id expire hours',get_pref(logger.gc_pref_client_id_expire_hours)||' hours');
       $if $$rac_lt_11_2  $then
         display_output('RAC pre-11.2 Code','TRUE');
+      $end
+      
+      $if $$logger_context $then
+        display_output('Using context', 'TRUE');
+      $else
+        display_output('Using context', 'FALSE');
       $end
 
       -- #46 Only display plugins if enabled
@@ -2655,7 +2668,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   function ok_to_log(p_level in number)
     return boolean
     $if 1=1
-      and $$rac_lt_11_2
+      and ($$rac_lt_11_2 or not $$logger_context)
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
@@ -2677,7 +2690,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
         dbms_output.put_line(l_scope || ': START');
       $end
 
-      $if $$rac_lt_11_2 $then
+      $if $$rac_lt_11_2 or not $$logger_context $then
         $if $$logger_debug $then
           dbms_output.put_line(l_scope || ': calling get_level_number');
         $end

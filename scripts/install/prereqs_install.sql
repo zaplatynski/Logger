@@ -33,8 +33,13 @@ begin
       l_dummy := l_sess_privs(l_priv);
     exception 
       when no_data_found then
-        dbms_output.put_line('Error, the current schema is missing the following privilege: '||l_priv);
-        l_priv_error := true;
+        -- #82
+        if l_priv = 'CREATE ANY CONTEXT' then
+          dbms_output.put_line('*** Warning: the current schema does not have CREATE ANY CONTEXT privlege. Logger will still work but is recommended to have this');
+        else
+          dbms_output.put_line('Error, the current schema is missing the following privilege: '||l_priv);
+          l_priv_error := true;
+        end if;
     end;
     
     l_priv := l_req_privs.next(l_priv);
