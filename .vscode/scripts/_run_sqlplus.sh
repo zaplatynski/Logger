@@ -35,7 +35,7 @@ echo "Parsing file: ${LIGHT_GREEN}$2${NC}"
 # sqlcl $1 << EOF
 sqlplus $ORACLE_SQL_CONNECTION << EOF
 set define off
-alter session set plsql_ccflags = 'no_op:false, logger_debug:true, APEX:true, logger_plugin_error: true';
+alter session set plsql_ccflags = 'logger_context:false, rac_lt_11_2:false, no_op:false, logger_debug:true, APEX:true, logger_plugin_error: true';
 --
 $2
 --
