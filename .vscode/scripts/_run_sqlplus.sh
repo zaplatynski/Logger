@@ -34,13 +34,14 @@ echo "Parsing file: ${LIGHT_GREEN}$2${NC}"
 # run sqlplus, execute the script, then get the error list and exit
 # sqlcl $1 << EOF
 sqlplus $ORACLE_SQL_CONNECTION << EOF
+set serveroutput on
 set define off
 alter session set plsql_ccflags = 'logger_context:false, rac_lt_11_2:false, no_op:false, logger_debug:true, APEX:true, logger_plugin_error: true';
+@$SQL_FILE_COLOR
 --
 $2
 --
 set define on
-@$SQL_FILE_COLOR
 -- Colors: http://orasql.org/2013/05/22/sqlplus-tips-6-colorizing-output/
 prompt &_C_RED
 show errors
