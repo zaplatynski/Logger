@@ -4,6 +4,8 @@
 <a name="plsql-example"></a>
 ## PL/SQL Procedure / Function Template
 
+_This template is a copy of [plmddoc](https://github.com/OraOpenSource/plsql-md-doc). Please review plmddoc for more information on auto generating documentation_
+
 For packages the recommended practice is as follows:
 
 ```sql
@@ -13,18 +15,17 @@ as
   gc_scope_prefix constant varchar2(31) := lower($$plsql_unit) || '.';
 
   /**
-   * TODO_Comments
+   * Description
    *
-   * Notes:
-   *  -
    *
-   * Related Tickets:
-   *  -
+   * @example
+   * 
+   * @issue
    *
-   * @author TODO
-   * @created TODO
-   * @param TODO
-   * @return TODO
+   * @author
+   * @created
+   * @param
+   * @return
    */
   procedure todo_proc_name(
     p_param1_todo in varchar2)
