@@ -1476,7 +1476,7 @@ Name | Description
 function ok_to_log(p_level in number)
   return boolean
   $if 1=1
-    and $$rac_lt_11_2
+    and ($$rac_lt_11_2 or not $$logger_context)
     and not dbms_db_version.ver_le_10_2
     and ($$no_op
 ```

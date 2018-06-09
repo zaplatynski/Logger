@@ -12,51 +12,56 @@ set serveroutput on
 
 -- SESSION PRIVILEGES
 declare
-    type t_sess_privs is table of pls_integer index by varchar2(50);
-    l_sess_privs t_sess_privs;
-    l_req_privs t_sess_privs;
-    l_priv varchar2(50);
-    l_dummy pls_integer;
-    l_priv_error  boolean := false;
+  type t_sess_privs is table of pls_integer index by varchar2(50);
+  l_sess_privs t_sess_privs;
+  l_req_privs t_sess_privs;
+  l_priv varchar2(50);
+  l_dummy pls_integer;
+  l_priv_error  boolean := false;
 begin
-    l_req_privs('CREATE SESSION')       := 1;            
-    l_req_privs('CREATE TABLE')         := 1;
-    l_req_privs('CREATE VIEW')          := 1;
-    l_req_privs('CREATE SEQUENCE')      := 1;
-    l_req_privs('CREATE PROCEDURE')     := 1;
-    l_req_privs('CREATE TRIGGER')       := 1;
-    l_req_privs('CREATE ANY CONTEXT')   := 1;
-    l_req_privs('CREATE JOB')           := 1;
+  l_req_privs('CREATE SESSION') := 1;            
+  l_req_privs('CREATE TABLE') := 1;
+  l_req_privs('CREATE VIEW') := 1;
+  l_req_privs('CREATE SEQUENCE') := 1;
+  l_req_privs('CREATE PROCEDURE') := 1;
+  l_req_privs('CREATE TRIGGER') := 1;
+  l_req_privs('CREATE ANY CONTEXT') := 1;
+  l_req_privs('CREATE JOB') := 1;
 
+  for c1 in (select privilege from session_privs) loop
+    l_sess_privs(c1.privilege) := 1;
+  end loop;  --c1
 
-    for c1 in (select privilege from session_privs)
-    loop
-        l_sess_privs(c1.privilege) := 1;
-    end loop;  --c1
-
-    dbms_output.put_line('_____________________________________________________________________________');
+  dbms_output.put_line('_____________________________________________________________________________');
+  
+  l_priv := l_req_privs.first;
+  loop
+  exit when l_priv is null;
+    begin
+      l_dummy := l_sess_privs(l_priv);
+    exception 
+      when no_data_found then
+        -- #82
+        if l_priv = 'CREATE ANY CONTEXT' then
+          dbms_output.put_line('*** Warning: the current schema does not have CREATE ANY CONTEXT privlege. Logger will still work but is recommended to have this');
+        else
+          dbms_output.put_line('Error, the current schema is missing the following privilege: '||l_priv);
+          l_priv_error := true;
+        end if;
+    end;
     
-    l_priv := l_req_privs.first;
-    loop
-    exit when l_priv is null;
-        begin
-            l_dummy := l_sess_privs(l_priv);
-        exception when no_data_found then
-            dbms_output.put_line('Error, the current schema is missing the following privilege: '||l_priv);
-            l_priv_error := true;
-        end;
-        l_priv := l_req_privs.next(l_priv);
-    end loop;
+    l_priv := l_req_privs.next(l_priv);
+  end loop;
     
-    if not l_priv_error then
-        dbms_output.put_line('User has all required privileges, installation will continue.');
-    end if;
-    
-    dbms_output.put_line('_____________________________________________________________________________');
+  if not l_priv_error then
+    dbms_output.put_line('User has all required privileges, installation will continue.');
+  end if;
+  
+  dbms_output.put_line('_____________________________________________________________________________');
 
-    if l_priv_error then
-      raise_application_error (-20000, 'One or more required privileges are missing.');
-    end if;
+  if l_priv_error then
+    raise_application_error (-20000, 'One or more required privileges are missing.');
+  end if;
 end;
 /
 
@@ -329,6 +334,12 @@ begin
   $if $$logger_no_op_install $then
     null;
   $else
+
+    -- #184 this table should only be updated by logger_prefs
+    if not logger.g_can_update_logger_prefs then
+      raise_application_error(-20001, 'Can not update logger_prefs from SQL. Use logger.set_pref instead');
+    end if;
+
     :new.pref_name := upper(:new.pref_name);
     :new.pref_type := upper(:new.pref_type);
 
@@ -402,16 +413,18 @@ begin
     using (
       select 'PURGE_AFTER_DAYS' pref_name, '7' pref_value from dual union
       select 'PURGE_MIN_LEVEL' pref_name, 'DEBUG' pref_value from dual union
-      select 'LOGGER_VERSION' pref_name, '1.0.0' pref_value from dual union -- 1.0.0 will be replaced when running the build script
+      select 'LOGGER_VERSION' pref_name, '3.2.0' pref_value from dual union -- 3.2.0 will be replaced when running the build script
       select 'LEVEL' pref_name, 'DEBUG' pref_value from dual union
-      select 'PROTECT_ADMIN_PROCS' pref_name, 'TRUE' pref_value from dual union
+      select 'PROTECT_ADMIN_PROCS' pref_name, 'FALSE' pref_value from dual union
       select 'INCLUDE_CALL_STACK' pref_name, 'TRUE' pref_value from dual union
       select 'PREF_BY_CLIENT_ID_EXPIRE_HOURS' pref_name, '12' pref_value from dual union
       select 'INSTALL_SCHEMA' pref_name, sys_context('USERENV','CURRENT_SCHEMA') pref_value from dual union
       -- #46
       select 'PLUGIN_FN_ERROR' pref_name, 'NONE' pref_value from dual union
       -- #64
-      select 'LOGGER_DEBUG' pref_name, 'FALSE' pref_value from dual
+      select 'LOGGER_DEBUG' pref_name, 'FALSE' pref_value from dual union
+      -- #82: By default if we can't create a context we wont
+      select 'GLOBAL_CONTEXT_NAME' pref_name, 'NONE' pref_value from dual
       ) d
       on (p.pref_name = d.pref_name)
     when matched then
@@ -735,20 +748,25 @@ prompt *** VIEWS ***
 
 prompt logger_logs_5_min
 
-create or replace force view logger_logs_5_min as
-	select * 
-      from logger_logs 
-	 where time_stamp > systimestamp - (5/1440)
+create or replace force view logger_logs_5_min 
+as
+	select /*+ qb_name(logger_logs_5_min) */
+    ll.* 
+	from logger_logs ll
+	where 1=1
+    and ll.time_stamp > cast(systimestamp as timestamp) - (5/1440)
 /
 
 prompt logger_logs_60_min
 
-create or replace force view logger_logs_60_min as
-	select * 
-      from logger_logs 
-	 where time_stamp > systimestamp - (1/24)
+create or replace force view logger_logs_60_min 
+as
+	select /*+ qb_name(logger_logs_60_min) */
+    ll.* 
+	from logger_logs ll
+	where 1=1
+    and ll.time_stamp > cast(systimestamp as timestamp) - (1/24)
 /
-
 
 prompt logger_logs_terse
 
@@ -800,11 +818,15 @@ as
   -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
   -- SOFTWARE.
 
-
   -- TYPES
+  /**
+  * @type rec_param `name`/`val` pair
+  * @type tab_param Array of `rec_param`
+  * @type rec_logger_log See [Logger Plugins](TODO LinkPlugins.md)
+  */
   type rec_param is record(
     name varchar2(255),
-    val varchar2(4000));
+    val varchar2(32767));
 
   type tab_param is table of rec_param index by binary_integer;
 
@@ -814,8 +836,48 @@ as
   );
 
 
-  -- VARIABLES
-	g_logger_version constant varchar2(10) := '1.0.0'; -- Don't change this. Build script will replace with right version number
+  -- CONSTANTS
+  -- TODO see the old API docs for breakdown of constants
+  /**
+  * @constant g_logger_version Version of Logger as a string (`major.minor.patch`)
+  * @constant g_logger_version_major Version (major) as number. Can be used for conditional compilation
+  * @constant g_logger_version_minor Version (minor) as number. Can be used for conditional compilation
+  * @constant g_logger_version_patch Version (patch) as number. Can be used for conditional compilation
+  * @constant g_context_name Context Logger uses for storing attributes.
+  *
+  * @constant g_off Logger level `off`
+  * @constant g_permanent Logger level `permanent`
+  * @constant g_error Logger level `error`
+  * @constant g_warning Logger level `warning`
+  * @constant g_information Logger level `information`
+  * @constant g_debug Logger level `debug`
+  * @constant g_timing Logger level `timing`
+  * @constant g_sys_context Logger level `sys_context`
+  * @constant g_apex Logger level `apex`
+  *
+  * @constant g_off_name Logger level `off` (name)
+  * @constant g_permanent_name Logger level `permanent` (name)
+  * @constant g_error_name Logger level `error` (name)
+  * @constant g_warning_name Logger level `warning` (name)
+  * @constant g_information_name Logger level `information` (name)
+  * @constant g_debug_name Logger level `debug` (name)
+  * @constant g_timing_name Logger level `timing` (name)
+  * @constant g_sys_context_name Logger level `sys_context` (name)
+  * @constant g_apex_name Logger level `apex` (name)
+  *
+  * @constant gc_empty_tab_param Empty param used for default value in logger main procedures.
+  *
+  * @constant g_apex_item_type_all `log_apex_items` takes in an optional variable `p_item_scope`. This determines which items to log in APEX. Log both application and page level items
+  * @constant g_apex_item_type_app Only application level items
+  * @constant g_apex_item_type_page Only page level items
+  */
+  -- Don't change any version numbers as build script will replace with right version number
+  -- #129 Don't mondify ANYTHING for the version information below as it's expect to be exactly as is
+	g_logger_version constant varchar2(10) := '3.2.0'; 
+  g_logger_version_major constant pls_integer := 3;
+  g_logger_version_minor constant pls_integer := 2;
+  g_logger_version_patch constant pls_integer := 0;
+
 	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
 
   g_off constant number := 0;
@@ -851,6 +913,13 @@ as
   -- Note to developers: This is only for internal Logger code. Do not use this as part of your code.
   g_pref_type_logger constant logger_prefs.pref_type%type := 'LOGGER'; -- If this changes need to modify logger_prefs.sql as it has a dependancy.
 
+
+  -- #184 Determines if setting logger_prefs from Logger rather than a SQL statement
+  -- This is NOT a documented variable and should not be used by other applications
+  -- Storing in pks as no use protecting it internally since anyone can disable the trigger if they want
+  -- This is not fool proof but should help encourage people not to set logger_prefs via SQL
+  g_can_update_logger_prefs boolean := false;
+
   -- Expose private functions only for testing during development
   $if $$logger_debug $then
     function is_number(p_str in varchar2)
@@ -883,10 +952,23 @@ as
       return boolean;
 
     function get_level_number
-      return number;
+      return number
+      $if $$rac_lt_11_2 or not $$logger_context $then  -- TODO mdsouza: I think we can remove this as all we care about is db_version
+        $if not dbms_db_version.ver_le_10_2 $then
+          result_cache
+        $end
+      $end
+    ;
 
     function include_call_stack
-      return boolean;
+      return boolean
+      $if 1=1
+        and ($$rac_lt_11_2 or not $$logger_context)
+        and not dbms_db_version.ver_le_10_2
+        and ($$no_op is null or not $$no_op) $then
+          result_cache
+      $end
+      ;
 
     function date_text_format_base (
       p_date_start in date,
@@ -986,7 +1068,7 @@ as
     p_level in logger_logs.logger_level%type default null);
 
     procedure log_apex_items(
-      p_text in varchar2 default 'Log APEX Items',
+      p_text in varchar2 default 'Log APEX Items. Query logger_logs_apex_items and filter on log_id',
       p_scope in logger_logs.scope%type default null,
       p_item_type in varchar2 default logger.g_apex_item_type_all,
       p_log_null_items in boolean default true,
@@ -1098,7 +1180,14 @@ as
     p_val in boolean);
 
   function ok_to_log(p_level in number)
-    return boolean;
+    return boolean
+    $if 1=1
+      and ($$rac_lt_11_2 or not $$logger_context)
+      and not dbms_db_version.ver_le_10_2
+      and ($$no_op is null or not $$no_op) $then
+        result_cache
+    $end
+    ;
 
   function ok_to_log(p_level in varchar2)
     return boolean;
@@ -1192,7 +1281,9 @@ as
   --  Introduced with #46
   --  $$LOGGER_PLUGIN_ERROR
   --
-
+  -- $$LOGGER_CONTEXT
+  -- #82
+  -- If true, context is used for values preferences. False we read from table each time
 
   -- TYPES
   type ts_array is table of timestamp index by varchar2(100);
@@ -1207,10 +1298,6 @@ as
   g_plug_logger_log_error rec_logger_log;
 
   g_in_plugin_error boolean := false;
-
-
-
-
 
 
   -- CONSTANTS
@@ -1241,6 +1328,7 @@ as
   gc_pref_client_id_expire_hours constant logger_prefs.pref_name%type := 'PREF_BY_CLIENT_ID_EXPIRE_HOURS';
   gc_pref_logger_debug constant logger_prefs.pref_name%type := 'LOGGER_DEBUG';
   gc_pref_plugin_fn_error constant logger_prefs.pref_name%type := 'PLUGIN_FN_ERROR';
+  gc_pref_global_context_name constant logger_prefs.pref_name%type := 'GLOBAL_CONTEXT_NAME';
 
 
 
@@ -1248,17 +1336,11 @@ as
   -- *** PRIVATE ***
 
   /**
-   *
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
+   * @private
    *
    * @author Martin D'Souza
    * @created
-   * @param p_str
+   * @param p_str String to convert to number
    * @return True if p_str is a number
    */
   function is_number(p_str in varchar2)
@@ -1275,13 +1357,9 @@ as
 
 
   /**
+   * @private
+   * 
    * Validates assertion. Will raise an application error if assertion is false
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Martin D'Souza
    * @created 29-Mar-2013
@@ -1304,13 +1382,8 @@ as
 
 
   /**
+   * @private
    * Returns the display/print friendly parameter information
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Martin D'Souza
    * @created 20-Jan-2013
@@ -1354,15 +1427,9 @@ as
   end get_param_clob;
 
 
-
   /**
+   * @private
    * Sets the global context
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
@@ -1388,18 +1455,24 @@ as
     $end
 
     commit; -- MD: moved commit to outside of the NO_OP check since commit or rollback must occur in this procedure
+  exception
+    when others then
+      -- #128 Error ORA-01031: insufficient privileges will be raised when the context is missing
+      -- This usually happens whent the schema has been copied or database replicated
+      if sqlcode = -01031 then
+        raise_application_error(-20001, logger.sprintf(q'!
+Context %s1 is missing (usually due to cloned shema or database). 
+Run: "create or replace context %s1 using logger accessed globally;" to recreate it
+See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
+          logger.g_context_name));
+      end if;  
   end save_global_context;
 
 
 
   /**
-   * Will return the extra column appended with the display friendly parameters
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
+   * @private
+   * Returns the extra column appended with the display friendly parameters
    *
    * @author Martin D'Souza
    * @created 1-May-2013
@@ -1430,13 +1503,8 @@ as
 
 
   /**
+   * @private
    * Returns common system level context values
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
@@ -1454,28 +1522,31 @@ as
     l_ctx clob;
     l_detail_level varchar2(20) := upper(p_detail_level);
 
-    procedure append_ctx(p_name in varchar2)
-    is
-      r_pad number := 30;
-      l_value varchar2(100);
+    $if $$no_op $then
+    $else
+      procedure append_ctx(p_name in varchar2)
+      is
+        r_pad number := 30;
+        l_value varchar2(100);
 
-      invalid_userenv_parm exception;
-      pragma exception_init(invalid_userenv_parm, -2003);
+        invalid_userenv_parm exception;
+        pragma exception_init(invalid_userenv_parm, -2003);
 
-    begin
-      l_value := sys_context('USERENV',p_name);
+      begin
+        l_value := sys_context('USERENV',p_name);
 
-      if p_show_null or l_value is not null then
-        if p_vertical then
-          l_ctx := l_ctx || rpad(p_name,r_pad,' ')||': '|| l_value || gc_cflf;
-        else
-          l_ctx := l_ctx || p_name||': '|| l_value ||', ';
+        if p_show_null or l_value is not null then
+          if p_vertical then
+            l_ctx := l_ctx || rpad(p_name,r_pad,' ')||': '|| l_value || gc_cflf;
+          else
+            l_ctx := l_ctx || p_name||': '|| l_value ||', ';
+          end if;
         end if;
-      end if;
-    exception
-      when invalid_userenv_parm then
-        null;
-    end append_ctx;
+      exception
+        when invalid_userenv_parm then
+          null;
+      end append_ctx;
+    $end
 
 
   begin
@@ -1554,13 +1625,8 @@ as
 
 
   /**
+   * @private
    * Checks if admin functions can be run
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
@@ -1581,7 +1647,7 @@ as
           l_return := true;
         else
           l_return := false;
-          raise_application_error (-20000, 'You are not authorized to call this procedure. Change Logger pref: PROTECT_ADMIN_PROCS to false to avoid this.');
+          raise_application_error (-20000, 'You are not authorized to call this procedure. Change Logger pref: PROTECT_ADMIN_PROCS to FALSE to avoid this.');
         end if;
       else
         l_return := true;
@@ -1594,22 +1660,17 @@ as
 
 
   /**
+   * @private
    *
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  - #111 Use get_pref to remove duplicate code
+   * @issue #111 Use get_pref to remove duplicate code
    *
    * @author Tyler Muth
    * @created ???
-   * @param
    * @return If client level specified will return it, otherwise global level.
    */
   function get_level_number
     return number
-    $if $$rac_lt_11_2 $then
+    $if $$rac_lt_11_2 or not $$logger_context $then  -- TODO mdsouza: I think we can remove this as all we care about is db_version
       $if not dbms_db_version.ver_le_10_2 $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
       $end
@@ -1621,7 +1682,6 @@ as
     $if $$logger_debug $then
       l_scope varchar2(30) := 'get_level_number';
     $end
-
   begin
     $if $$no_op $then
       return g_off;
@@ -1638,22 +1698,16 @@ as
 
 
   /**
-   * Determines if callstack should be while logging
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
+   * @private
    *
    * @author Tyler Muth
    * @created ???
-   * @return
+   * @return true if call stack should be returned when logging
    */
   function include_call_stack
     return boolean
     $if 1=1
-      and $$rac_lt_11_2
+      and ($$rac_lt_11_2 or not $$logger_context)
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
@@ -1664,7 +1718,7 @@ as
     $if $$no_op $then
       return false;
     $else
-      $if $$rac_lt_11_2 $then
+      $if $$rac_lt_11_2 or not $$logger_context $then
         l_call_stack_pref := get_pref(logger.gc_pref_include_call_stack);
       $else
         l_call_stack_pref := sys_context(g_context_name,gc_ctx_attr_include_call_stack);
@@ -1688,13 +1742,8 @@ as
 
 
   /**
+   * @private
    * Returns date diff in "... sectons/minutes/days/etc ago" format
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
@@ -1736,13 +1785,9 @@ as
 
 
   /**
+   * @private
+   * 
    * Parses the callstack to get unit and line number
-   *
-   * Notes:
-   *  - Private
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
@@ -1771,8 +1816,8 @@ as
 
 
   /**
+   * @private
    * Main procedure that will store log data into logger_logs table
-   *
    *
    * Modifications
    *  - 2.1.0: If text is > 4000 characters, it will be moved to the EXTRA column
@@ -1785,7 +1830,6 @@ as
    * @param p_extra
    * @param p_callstack
    * @param p_params
-   *
    */
   procedure log_internal(
     p_text in varchar2,
@@ -1835,6 +1879,7 @@ as
 
 
   /**
+   * @private
    * Run plugin
    *
    * Notes:
@@ -1842,8 +1887,7 @@ as
    *  - -- FUTURE mdsouza: When supporting other plugin types put conditional compilation where applicable
    *  - -- FUTURE mdsouza: Include this in tests (#86)
    *
-   * Related Tickets:
-   *  - #46
+   * @issue #46
    *
    * @author Martin D'Souza
    * @created 11-Mar-2015
@@ -1899,50 +1943,54 @@ as
     end f_get_set_global_context;
 
   begin
-    start_stop_plugin(p_in_plugin => true);
 
-    $if $$logger_debug $then
-      dbms_output.put_line('in run_plugin. g_in_plugin_error: ' || logger.tochar(g_in_plugin_error));
-    $end
-
-    if 1=2 then
+    $if $$no_op $then
       null;
-    elsif p_logger_log.logger_level = logger.g_error then
-      l_plugin_ctx := gc_ctx_plugin_fn_error;
-    end if;
-
-    if l_plugin_ctx is not null then
-      l_plugin_fn := coalesce(
-        sys_context(g_context_name, l_plugin_ctx),
-        f_get_set_global_context(p_ctx => l_plugin_ctx));
+    $else
+      start_stop_plugin(p_in_plugin => true);
 
       $if $$logger_debug $then
-        dbms_output.put_line('l_plugin_fn: ' || l_plugin_fn);
+        dbms_output.put_line('in run_plugin. g_in_plugin_error: ' || logger.tochar(g_in_plugin_error));
       $end
 
-      if 1=1
-        and l_plugin_fn is not null
-        and l_plugin_fn != 'NONE' then
+      if 1=2 then
+        null;
+      elsif p_logger_log.logger_level = logger.g_error then
+        l_plugin_ctx := gc_ctx_plugin_fn_error;
+      end if;
 
-        l_sql := 'begin ' || l_plugin_fn || '(logger.get_plugin_rec(' || p_logger_log.logger_level || ')); end;';
+      if l_plugin_ctx is not null then
+        l_plugin_fn := coalesce(
+          sys_context(g_context_name, l_plugin_ctx),
+          f_get_set_global_context(p_ctx => l_plugin_ctx));
 
         $if $$logger_debug $then
-          dbms_output.put_line('l_sql: ' || l_sql);
+          dbms_output.put_line('l_plugin_fn: ' || l_plugin_fn);
         $end
 
-        execute immediate l_sql;
+        if 1=1
+          and l_plugin_fn is not null
+          and l_plugin_fn != 'NONE' then
 
+          l_sql := 'begin ' || l_plugin_fn || '(logger.get_plugin_rec(' || p_logger_log.logger_level || ')); end;';
+
+          $if $$logger_debug $then
+            dbms_output.put_line('l_sql: ' || l_sql);
+          $end
+
+          execute immediate l_sql;
+
+        else
+          -- Should never reach this point since plugin_fn should have a value
+          logger.log_error('Error l_plugin_fn does not have value');
+        end if; -- l_plugin_fn
       else
-        -- Should never reach this point since plugin_fn should have a value
-        logger.log_error('Error l_plugin_fn does not have value');
-      end if; -- l_plugin_fn
-    else
-      -- Should never reach this point since plugin_ctx should have a value
-      logger.log_error('Error l_plugin_ctx does not have value');
-    end if; -- l_plugin_ctx is not null
+        -- Should never reach this point since plugin_ctx should have a value
+        logger.log_error('Error l_plugin_ctx does not have value');
+      end if; -- l_plugin_ctx is not null
 
-    start_stop_plugin(p_in_plugin => false);
-
+      start_stop_plugin(p_in_plugin => false);
+    $end
   exception
     when others then
       logger.append_param(l_params, 'Logger.id', p_logger_log.id);
@@ -1963,297 +2011,18 @@ as
   end run_plugin;
 
 
-
-
-  -- **** PUBLIC ****
-
-
   /**
-   * Sets all the contexts to null
-   *
-   * Notes:
-   *  - Though this is public it is not a documented procedure. Only used with logger_configure.
-   *
-   * Related Tickets:
-   *  - #46 Plugin support
-   *  - #110 Clear all contexts (including ones with client identifier)
-   *
-   * @author Tyler Muth
-   * @created ???
-   */
-  procedure null_global_contexts
-  is
-    pragma autonomous_transaction;
-  begin
-    $if $$no_op or $$rac_lt_11_2 $then
-      null;
-    $else
-      dbms_session.clear_all_context(
-         namespace => g_context_name);
-    $end
-
-    commit;
-  end null_global_contexts;
-
-
-  /**
-   * Converts string names to text value
-   *
-   * Changes
-   *  - 2.1.0: Start to use global variables and correct numbers
-   *
-   * @author Tyler Muth
-   * @created ???
-   *
-   * @param p_level String representation of level
-   * @return level number. -1 if not found
-   */
-  function convert_level_char_to_num(
-    p_level in varchar2)
-    return number
-  is
-    l_level         number;
-  begin
-    $if $$no_op $then
-      return null;
-    $else
-      case p_level
-        when g_off_name then l_level := g_off;
-        when g_permanent_name then l_level := g_permanent;
-        when g_error_name then l_level := g_error;
-        when g_warning_name then l_level := g_warning;
-        when g_information_name then l_level := g_information;
-        when g_debug_name then l_level := g_debug;
-        when g_timing_name then l_level := g_timing;
-        when g_sys_context_name then l_level := g_sys_context;
-        when g_apex_name then l_level := g_apex;
-        else l_level := -1;
-      end case;
-    $end
-
-    return l_level;
-  end convert_level_char_to_num;
-
-
-  /**
-   * Converts the logger level num to char format
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #48
-   *
-   * @author Martin D'Souza
-   * @created 14-Jun-2014
-   * @param p_level
-   * @return Logger level string format
-   */
-  function convert_level_num_to_char(
-    p_level in number)
-    return varchar2
-  is
-    l_return varchar2(255);
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      l_return :=
-        case p_level
-          when g_off then g_off_name
-          when g_permanent then g_permanent_name
-          when g_error then g_error_name
-          when g_warning then g_warning_name
-          when g_information then g_information_name
-          when g_debug then g_debug_name
-          when g_timing then g_timing_name
-          when g_sys_context then g_sys_context_name
-          when g_apex then g_apex_name
-          else null
-        end;
-    $end
-
-    return l_return;
-  end convert_level_num_to_char;
-
-
-
-
-
-  /**
-   * Determines if the statement can be stored in LOGGER_LOGS
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #44: Expose publically
-   *
-   * @author Tyler Muth
-   * @created ???
-   *
-   * @param p_level Level (number)
-   * @return True of statement can be logged to LOGGER_LOGS
-   */
-  function ok_to_log(p_level in number)
-    return boolean
-    $if 1=1
-      and $$rac_lt_11_2
-      and not dbms_db_version.ver_le_10_2
-      and ($$no_op is null or not $$no_op) $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
-    $end
-  is
-    l_level number;
-    l_level_char varchar2(50);
-
-    $if $$logger_debug $then
-      l_scope varchar2(30) := 'ok_to_log';
-    $end
-
-  begin
-    $if $$no_op $then
-      return false;
-    $else
-
-      $if $$logger_debug $then
-        dbms_output.put_line(l_scope || ': in function');
-      $end
-
-      $if $$rac_lt_11_2 $then
-        $if $$logger_debug $then
-          dbms_output.put_line(l_scope || ': calling get_level_number');
-        $end
-        l_level := get_level_number;
-      $else
-        l_level := sys_context(g_context_name,gc_ctx_attr_level);
-
-        if l_level is null then
-          $if $$logger_debug $then
-            dbms_output.put_line(l_scope || ': level was null, getting and setting in context');
-          $end
-
-          l_level := get_level_number;
-
-          save_global_context(
-            p_attribute => gc_ctx_attr_level,
-            p_value => l_level,
-            p_client_id => sys_context('userenv','client_identifier'));
-        end if;
-      $end
-
-      if l_level >= p_level then
-        return true;
-      else
-        return false;
-      end if;
-   $end
-  end ok_to_log;
-
-
-  /**
-   * Determines if log statements will actually be stored.
-   *
-   * @author Martin D'Souza
-   * @created 25-Jul-2013
-   *
-   * @param p_level Level (DEBUG etc..)
-   * @return True of log statements for that level or below will be logged
-   */
-  function ok_to_log(p_level in varchar2)
-    return boolean
-  as
-  begin
-    $if $$no_op $then
-      return false;
-    $else
-      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level));
-    $end
-  end ok_to_log;
-
-
-
-
-  /**
-   * ???
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_date
-   * @return
-   */
-  function date_text_format (p_date in date)
-    return varchar2
-  as
-  begin
-    $if $$no_op $then
-      return null;
-    $else
-      return date_text_format_base(
-        p_date_start => p_date   ,
-        p_date_stop  => sysdate);
-    $end
-  end date_text_format;
-
-
-  function get_character_codes(
-    p_string        in varchar2,
-    p_show_common_codes   in boolean default true)
-    return varchar2
-  is
-    l_string  varchar2(32767);
-    l_dump    varchar2(32767);
-    l_return  varchar2(32767);
-  begin
-    -- replace tabs with ^
-    l_string := replace(p_string,chr(9),'^');
-    -- replace all other control characters such as carriage return / line feeds with ~
-    l_string := regexp_replace(l_string,'[[:cntrl:]]','~',1,0,'m');
-
-    select dump(p_string) into l_dump from dual;
-
-    l_dump  := regexp_replace(l_dump,'(^.+?:)(.*)','\2',1,0); -- get everything after the :
-    l_dump  := ','||l_dump||','; -- leading and trailing commas
-    l_dump  := replace(l_dump,',',',,'); -- double the commas. this is for the regex.
-    l_dump  := regexp_replace(l_dump,'(,)([[:digit:]]{1})(,)','\1  \2\3',1,0); -- lpad all single digit numbers out to 3
-    l_dump  := regexp_replace(l_dump,'(,)([[:digit:]]{2})(,)','\1 \2\3',1,0);  -- lpad all double digit numbers out to 3
-    l_dump  := ltrim(replace(l_dump,',,',','),','); -- remove the double commas
-    l_dump  := lpad(' ',(5-instr(l_dump,',')),' ')||l_dump;
-
-    -- replace every individual character with 2 spaces, itself and a comma so it lines up with the dump output
-    l_string := ' '||regexp_replace(l_string,'(.){1}','  \1,',1,0);
-
-    l_return := rtrim(l_dump,',') || chr(10) || rtrim(l_string,',');
-
-    if p_show_common_codes then
-      l_return := 'Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab'||chr(10) ||l_return;
-    end if;
-
-    return l_return;
-
-  end get_character_codes;
-
-  /**
+   * @private
    * Store APEX items in logger_logs_apex_items
    *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #115: Only log not-null values
-   *  - #114: Bulk insert (no more row by row)
-   *  - #54: Support for p_item_type
+   * @issue #115: Only log not-null values
+   * @issue #114: Bulk insert (no more row by row)
+   * @issue #54: Support for p_item_type
    *
    * @author Tyler Muth
    * @created ???
    * @param p_log_id logger_logs.id to reference
-   * @param p_item_type Either the g_apex_item_type_... type or just the APEX page number for a specific page. It is assumed that it has been validated by the time it hits here.
+   * @param p_item_type Either the `g_apex_item_type_...` type or just the APEX page number for a specific page. It is assumed that it has been validated by the time it hits here.
    * @param p_log_null_items If set to false, null values won't be logged
    */
   procedure snapshot_apex_items(
@@ -2314,15 +2083,366 @@ as
     $end -- $$no_op
   end snapshot_apex_items;
 
+  /**
+   * @private
+   * Wrapper to determine if the level is a valid level
+   *
+   *
+   * @example
+   *
+   * declare
+   *   l_valid boolean;
+   * begin
+   *   -- Note: this won't actually work since it's private function
+   *   l_valid := logger.is_valid_level(p_level => logger.g_error_name);
+   * end;
+   * /
+   *
+   * @issue #184 Initial ticket.
+   *
+   * @author Martin D'Souza
+   * @created 30-May-2018
+   * @param p_level
+   * @return True of level is valid
+   */
+  function is_valid_level(
+    p_level in varchar2)
+    return boolean
+  as
+  begin
+    return p_level in (g_off_name, g_permanent_name, g_error_name, g_warning_name, g_information_name, g_debug_name, g_timing_name, g_sys_context_name, g_apex_name);
+  end is_valid_level;
 
   /**
+   * @private
+   * Returns all level names as a string
    *
+   *
+   * @example
+   *
+   *
+   * @issue #184 Initial ticket.
+   *
+   * @author Martin D'Souza
+   * @created 30-May-2018
+   * @param p_delimiter delimeter for values
+   * @return list of levels delimited by p_delimiter
+   */
+  function get_all_level_names(
+    p_delimiter in varchar2 default ', ')
+    return varchar2
+  as
+  begin
+    return
+      g_off_name || p_delimiter ||
+      g_permanent_name || p_delimiter ||
+      g_error_name || p_delimiter ||
+      g_warning_name || p_delimiter ||
+      g_information_name || p_delimiter ||
+      g_debug_name || p_delimiter ||
+      g_timing_name || p_delimiter ||
+      g_sys_context_name || p_delimiter ||
+      g_apex_name;
+  end get_all_level_names;
+
+
+  -- **** PUBLIC BUT NOT DOCUMENTED ****
+
+  /*!
+   * Sets all the contexts to null
    *
    * Notes:
-   *  -
+   *  - Though this is public it is not a documented procedure. Only used with logger_configure.
+   *
+   * @issue#46 Plugin support
+   * @issue#110 Clear all contexts (including ones with client identifier)
+   *
+   * @author Tyler Muth
+   * @created ???
+   */
+  procedure null_global_contexts
+  is
+    pragma autonomous_transaction;
+  begin
+    $if $$no_op or $$rac_lt_11_2 or not $$logger_context $then
+      null;
+    $else
+      dbms_session.clear_all_context(namespace => g_context_name);
+    $end
+
+    commit;
+  end null_global_contexts;
+
+
+  -- TODO mdsouza: see about dropping this as it's not being used
+  /*!
+   * Displays commonly used dbms_output SQL*Plus settings
+   *
+   * @author Tyler Muth
+   * @created ???
+   */
+  procedure sqlplus_format
+  is
+  begin
+    execute immediate 'begin dbms_output.enable(1000000); end;';
+    dbms_output.put_line('set linesize 200');
+    dbms_output.put_line('set pagesize 100');
+
+    dbms_output.put_line('column id format 999999');
+    dbms_output.put_line('column text format a75');
+    dbms_output.put_line('column call_stack format a100');
+    dbms_output.put_line('column extra format a100');
+
+  end sqlplus_format;
+
+
+  -- TODO mdsouza: make private?
+  /*!
+   * Returns the rec_logger_logs for given logger_level
+   * Used for plugin.
+   * Not meant to be called by general public, and thus not documented
+   *
+   * Notes:
+   *  - -- FUTURE mdsouza: Add tests for this (#86)
    *
    * Related Tickets:
-   *  - #46: Added plugin support
+   *  - #46
+   *
+   * @author Martin D'Souza
+   * @created 11-Mar-2015
+   * @param p_logger_level Logger level of plugin wanted to return
+   * @return Logger rec based on plugin type
+   */
+  function get_plugin_rec(
+    p_logger_level in logger_logs.logger_level%type)
+    return logger.rec_logger_log
+  as
+  begin
+
+    if p_logger_level = logger.g_error then
+      return g_plug_logger_log_error;
+    end if;
+  end get_plugin_rec;
+
+
+  -- **** PUBLIC ****
+
+
+
+  /**
+   * Since the main Logger procedures all have the same syntax and behavior (except for the procedure names) the documentation has been combined to avoid replication.
+   *
+   * @example
+   *
+   * -- The following code snippet highlights the main Logger procedures. Since they all have the same parameters, this will serve as the general example for all the main Logger procedures.
+   * begin
+   *   logger.log('This is a debug message. (level = DEBUG)');
+   *   logger.log_information('This is an informational message. (level = INFORMATION)');
+   *   logger.log_warning('This is a warning message. (level = WARNING)');
+   *   logger.log_error('This is an error message (level = ERROR)');
+   *   logger.log_permanent('This is a permanent message, good for upgrades and milestones. (level = PERMANENT)');
+   * end;
+   * /
+   * 
+   * select id, logger_level, text
+   * from logger_logs_5_min
+   * order by id;
+   * 
+   *   ID LOGGER_LEVEL TEXT
+   * ---- ------------ ------------------------------------------------------------------------------------------
+   *   10	       16 This is a debug message. (level = DEBUG)
+   *   11		8 This is an informational message. (level = INFORMATION)
+   *   12	4 This is a warning message. (level = WARNING)
+   *   13		2 This is an error message (level = ERROR)
+   *   14		1 This is a permanent message, good for upgrades and milestones. (level = PERMANENT)
+   *
+   *
+   * -- The following example shows how to use the p_params parameter. 
+   * -- The parameter values are stored in the EXTRA column.
+   *
+   * create or replace procedure p_demo_procedure(
+   *   p_empno in emp.empno%type,
+   *   p_ename in emp.ename%type)
+   * as
+   *   l_scope logger_logs.scope%type := 'p_demo_function';
+   *   l_params logger.tab_param;
+   * begin
+   *   logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
+   *   logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
+   *   logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point
+   *   -- ...
+   * exception
+   *   when others then
+   *     logger.log_error('Unhandled Exception', l_scope, null, l_params);
+   * end p_demo_procedure;
+   * /
+   *
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_text Maps to the `text` column in `logger_logs`. It can handle up to 32767 characters. If `p_text` exceeds 4000 characters its content will be appended to the `extra` column. If you need to store large blocks of text (i.e. clobs) use the `p_extra` (`clob`) parameter.
+   * @param p_scope Optional but highly recommend. The idea behind `scope` is to give some context to the log message, such as the application, `package.procedure` where it was called from. Logger captures the call stack, as well as module and action which are great for APEX logging as they are app number / page number. However none of these options gives you a clean and consistent way to group messages. The `p_scope` parameter performs a `lower()` on the input and stores it in the `scope` column. It is recommended to use `package.procedure` in most cases.
+   * @param p_extra Use for logging large (over 4000 characters or `clob`s) blocks of text.
+   * @param p_params Stores the parameters object. The goal of this parameter is to allow for a simple and consistent method to log the parameters to a given function. The values are explicitly converted to a string so there is no need to convert them when appending a parameter. 
+   *  </br></br>The data from the parameters array will be appended to the `extra` column.
+   *  </br>Since most production instances set the logging level to error, it is highly recommended that you leverage this 4th parameter when calling logger.log_error so that developers know the input that triggered the error.
+   */
+  procedure log(
+    p_text in varchar2,
+    p_scope in varchar2 default null,
+    p_extra in clob default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+  begin
+
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        log_internal(
+          p_text => p_text,
+          p_log_level => logger.g_debug,
+          p_scope => p_scope,
+          p_extra => p_extra,
+          p_callstack => dbms_utility.format_call_stack,
+          p_params => p_params);
+      end if;
+    $end
+  end log;
+
+
+  /**
+   * See [`logger.log`](#log) documentation
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_text
+   * @param p_scope
+   * @param p_extra
+   * @param p_params
+   */
+  procedure log_information(
+    p_text in varchar2,
+    p_scope in varchar2 default null,
+    p_extra in clob default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_information) then
+        log_internal(
+          p_text => p_text,
+          p_log_level => logger.g_information,
+          p_scope => p_scope,
+          p_extra => p_extra,
+          p_callstack => dbms_utility.format_call_stack,
+          p_params => p_params);
+      end if;
+    $end
+  end log_information;
+
+
+  /**
+   * Shortcut to [`log_information`](#log_information)
+   *
+   * @issue #80
+   *
+   * @author Martin D'Souza
+   * @created 9-Mar-2015
+   * @param p_text
+   * @param p_scope
+   * @param p_extra
+   * @param p_params
+   */
+  procedure log_info(
+    p_text in varchar2,
+    p_scope in varchar2 default null,
+    p_extra in clob default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.log_information(
+        p_text => p_text,
+        p_scope => p_scope,
+        p_extra => p_extra,
+        p_params => p_params
+      );
+    $end
+  end log_info;
+
+  /**
+   * See [`logger.log`](#log) documentation
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_text
+   * @param p_scope
+   * @param p_extra
+   * @param p_params
+   */
+  procedure log_warning(
+    p_text in varchar2,
+    p_scope in varchar2 default null,
+    p_extra in clob default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_warning) then
+        log_internal(
+          p_text => p_text,
+          p_log_level => logger.g_warning,
+          p_scope => p_scope,
+          p_extra => p_extra,
+          p_callstack => dbms_utility.format_call_stack,
+          p_params => p_params);
+      end if;
+    $end
+  end log_warning;
+
+
+  /**
+   * Shortcut to [`log_warning`](#log_warning)
+   *
+   * @issue #80
+   *
+   * @author Martin D'Souza
+   * @created 9-9-Mar-2015
+   * @param p_text
+   * @param p_scope
+   * @param p_extra
+   * @param p_params
+   */
+  procedure log_warn(
+    p_text in varchar2,
+    p_scope in varchar2 default null,
+    p_extra in clob default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.log_warning(
+        p_text => p_text,
+        p_scope => p_scope,
+        p_extra => p_extra,
+        p_params => p_params
+      );
+    $end
+  end log_warn;
+
+  /**
+   * See [`logger.log`](#log) documentation
+   * 
+   * @issue #46: Added plugin support
    *
    * @author Tyler Muth
    * @created ???
@@ -2393,13 +2513,7 @@ as
 
 
   /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
+   * See [`logger.log`](#log) documentation
    *
    * @author Tyler Muth
    * @created ???
@@ -2430,253 +2544,54 @@ as
       end if;
     $end
   end log_permanent;
-
-
-  /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_text
-   * @param p_scope
-   * @param p_extra
-   * @param p_params
-   */
-  procedure log_warning(
-    p_text in varchar2,
-    p_scope in varchar2 default null,
-    p_extra in clob default null,
-    p_params in tab_param default logger.gc_empty_tab_param)
-  is
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_warning) then
-        log_internal(
-          p_text => p_text,
-          p_log_level => logger.g_warning,
-          p_scope => p_scope,
-          p_extra => p_extra,
-          p_callstack => dbms_utility.format_call_stack,
-          p_params => p_params);
-      end if;
-    $end
-  end log_warning;
-
-
-  /**
-   * Wrapper for log_warning
-   *
-   * Notes:
-   *  - #80
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Martin D'Souza
-   * @created 9-9-Mar-2015
-   * @param p_text
-   * @param p_scope
-   * @param p_extra
-   * @param p_params
-   */
-  procedure log_warn(
-    p_text in varchar2,
-    p_scope in varchar2 default null,
-    p_extra in clob default null,
-    p_params in tab_param default logger.gc_empty_tab_param)
-  is
-  begin
-    logger.log_warning(
-      p_text => p_text,
-      p_scope => p_scope,
-      p_extra => p_extra,
-      p_params => p_params
-    );
-  end log_warn;
-
-  /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_text
-   * @param p_scope
-   * @param p_extra
-   * @param p_params
-   */
-  procedure log_information(
-    p_text in varchar2,
-    p_scope in varchar2 default null,
-    p_extra in clob default null,
-    p_params in tab_param default logger.gc_empty_tab_param)
-  is
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_information) then
-        log_internal(
-          p_text => p_text,
-          p_log_level => logger.g_information,
-          p_scope => p_scope,
-          p_extra => p_extra,
-          p_callstack => dbms_utility.format_call_stack,
-          p_params => p_params);
-      end if;
-    $end
-  end log_information;
-
-
-  /**
-   * Wrapper for short call to log_information
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #80
-   *
-   * @author Martin D'Souza
-   * @created 9-Mar-2015
-   * @param p_text
-   * @param p_scope
-   * @param p_extra
-   * @param p_params
-   */
-  procedure log_info(
-    p_text in varchar2,
-    p_scope in varchar2 default null,
-    p_extra in clob default null,
-    p_params in tab_param default logger.gc_empty_tab_param)
-  is
-  begin
-    logger.log_information(
-      p_text => p_text,
-      p_scope => p_scope,
-      p_extra => p_extra,
-      p_params => p_params
-    );
-  end log_info;
-
-
-  /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_text
-   * @param p_scope
-   * @param p_extra
-   * @param p_params
-   */
-  procedure log(
-    p_text in varchar2,
-    p_scope in varchar2 default null,
-    p_extra in clob default null,
-    p_params in tab_param default logger.gc_empty_tab_param)
-  is
-  begin
-
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_debug) then
-        log_internal(
-          p_text => p_text,
-          p_log_level => logger.g_debug,
-          p_scope => p_scope,
-          p_extra => p_extra,
-          p_callstack => dbms_utility.format_call_stack,
-          p_params => p_params);
-      end if;
-    $end
-  end log;
-
-
-  /**
-   * Get list of CGI values
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_show_null
-   * @return CGI values
-   */
-  function get_cgi_env(
-    p_show_null   in boolean default false)
-    return clob
-  is
-    l_cgienv clob;
-
-    $if $$no_op is null or not $$no_op $then
-      procedure append_cgi_env(
-        p_name    in varchar2,
-        p_val   in varchar2)
-      is
-        r_pad number := 30;
-      begin
-        if p_show_null or p_val is not null then
-          l_cgienv := l_cgienv || rpad(p_name,r_pad,' ')||': '||p_val||gc_cflf;
-        end if;
-      end append_cgi_env;
-    $end
-
-  begin
-    $if $$no_op $then
-      return null;
-    $else
-      for i in 1..nvl(owa.num_cgi_vars,0) loop
-        append_cgi_env(
-          p_name      => owa.cgi_var_name(i),
-          p_val       => owa.cgi_var_val(i));
-
-      end loop;
-
-      return l_cgienv;
-    $end
-  end get_cgi_env;
-
+  
 
   /**
    * Logs system environment variables
    *
-   * Notes:
-   *  -
+   * There are many occasions when the value of one of the `userenv` session variables helps to debug a problem. 
+   * `logger.log_userenv`  will log `userenv` session variables variables and their values in the `extra` column.
    *
-   * Related Tickets:
-   * - #29 Support for definging level
+   * Note: `log_userenv` will be logged using the `g_sys_context` (i.e. the current logger level).
+   *
+   * @example
+   *
+   * exec logger.log_userenv('NLS');
+   * 
+   * select text,extra from logger_logs_5_min;
+   * 
+   * TEXT                                           EXTRA
+   * ---------------------------------------------- -----------------------------------------------------------------
+   * USERENV values stored in the EXTRA column      NLS_CALENDAR                  : GREGORIAN
+   *                                                NLS_CURRENCY                  : $
+   *                                                NLS_DATE_FORMAT               : DD-MON-RR
+   *                                                NLS_DATE_LANGUAGE             : AMERICAN
+   *                                                NLS_SORT                      : BINARY
+   *                                                NLS_TERRITORY                 : AMERICA
+   *                                                LANG                          : US
+   *                                                LANGUAGE                      : AMERICAN_AMERICA.WE8MSWIN1252
+   * exec logger.log_userenv('USER');
+   * 
+   * select text,extra from logger_logs_5_min;
+   * TEXT                                               EXTRA
+   * -------------------------------------------------- -------------------------------------------------------
+   * USERENV values stored in the EXTRA column          CURRENT_SCHEMA                : LOGGER
+   *                                                    SESSION_USER                  : LOGGER
+   *                                                    OS_USER                       : tmuth
+   *                                                    IP_ADDRESS                    : 192.168.1.7
+   *                                                    HOST                          : WORKGROUP\TMUTH-LAP
+   *                                                    TERMINAL                      : TMUTH-LAP
+   *                                                    AUTHENTICATED_IDENTITY        : logger
+   *                                                    AUTHENTICATION_METHOD         : PASSWORD
+   * @issue #29 Support for definging level
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_detail_level USER, ALL, NLS, INSTANCE
-   * @param p_show_null
-   * @param p_scope
-   * @param p_level Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug(default) will not store values when level is set to ERROR.
+   * @param p_detail_level Level of `user_env` variables to log. Values: `USER`, `ALL`, `NLS`, `INSTANCE`
+   * @param p_show_null If `true`, then variables that have no value will still be displayed.
+   * @param p_scope `scope` to use when logging values.
+   * @param p_level Highest level to run at (default `logger.g_debug`). 
+   *  Example: If set to `logger.g_error` it will work when both in `debug` and `error` modes. However if set to `logger.g_debug`(default) will not store values when `level` is set to `error`.
    */
   procedure log_userenv(
     p_detail_level in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE,
@@ -2707,18 +2622,32 @@ as
 
   /**
    * Logs CGI environment variables
+   * Note: This option only works within a web session
    *
-   * Notes:
-   *  -
+   * @example
    *
-   * Related Tickets:
-   *  -
+   * exec logger.log_cgi_env;
+   * 
+   * select extra from logger_logs where text like '%CGI%';
+   * TEXT                                               EXTRA
+   * -------------------------------------------------- -------------------------------------------------------
+   *  ...
+   * SERVER_SOFTWARE               : Oracle-Application-Server-10g/10.1.3.1.0 Oracle-HTTP-Server
+   * GATEWAY_INTERFACE             : CGI/1.1
+   * SERVER_PORT                   : 80
+   * SERVER_NAME                   : 11g
+   * REQUEST_METHOD                : POST
+   * PATH_INFO                     : /wwv_flow.show
+   * SCRIPT_NAME                   : /pls/apex
+   * REMOTE_ADDR                   : 192.168.1.7
+   * ...
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_show_null
-   * @param p_scope
-   * @param p_level Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug(default) will not store values when level is set to ERROR.
+   * @param p_show_null If `true`, then variables that have no value will still be displayed.
+   * @param p_scope `scope` to log CGI variables under.
+   * @param p_level Highest level to run at (default `logger.g_debug`). 
+   *  Example: If set to `logger.g_error` it will work when both in `debug` and `error` modes. However if set to `logger.g_debug`(default) will not store values when `level` is set to `error`.
    */
   procedure log_cgi_env(
     p_show_null in boolean default false,
@@ -2743,20 +2672,15 @@ as
 
 
   /**
-   * Logs character codes for given string
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
+   * Logs character codes for given string. See [`get_character_codes`](#get_character_codes) for detailed information
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_text
-   * @param p_scope
-   * @param p_show_common_codes
-   * @param p_level Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug(default) will not store values when level is set to ERROR.
+   * @param p_text Text to retrieve character codes for.
+   * @param p_scope `scope` to log text under.
+   * @param p_show_common_codes Provides legend of common character codes in output.
+   * @param p_level Highest level to run at (default `logger.g_debug`). 
+   *  Example: If set to `logger.g_error` it will work when both in `debug` and `error` modes. However if set to `logger.g_debug`(default) will not store values when `level` is set to `error`.
    */
   procedure log_character_codes(
     p_text in varchar2,
@@ -2784,26 +2708,55 @@ as
 
 
   /**
-   * Log's APEX items
+   * Logs APEX items
+   * This feature is useful in debugging issues in an APEX application that are related session state. 
+   * The `developers toolbar` in APEX provides a place to view session state, but it won't tell you the value of items midway through page rendering or right before or after an AJAX call.
    *
-   * Notes:
-   *  -
+   * @example
    *
-   * Related Tickets:
-   *  - #115 Only log not-null values
-   *  - #29 Support for definging level
-   *  - #54: Add p_item_type
+   * -- Include in your APEX code
+   * begin
+   *   logger.log_apex_items('Debug Edit Customer');
+   * end;
+   * 
+   *
+   * -- To see the logged values
+   * select id,logger_level,text,module,action,client_identifier
+   * from logger_logs
+   * where logger_level = 128;
+   * 
+   *  ID     LOGGER_LEVEL TEXT                 MODULE                 ACTION    CLIENT_IDENTIFIER
+   * ------- ------------ -------------------- ---------------------- --------- --------------------
+   *      47          128 Debug Edit Customer  APEX:APPLICATION 100   PAGE 7    ADMIN:45588554040361
+   * 
+   * select *
+   * from logger_logs_apex_items
+   * where log_id = 47; --log_id relates to logger_logs.id
+   * 
+   * ID      LOG_ID  APP_SESSION    ITEM_NAME                 ITEM_VALUE
+   * ------- ------- ---------------- ------------------------- ---------------------------------------------
+   *     136      47   45588554040361 P1_QUOTA
+   *     137      47   45588554040361 P1_TOTAL_SALES
+   *     138      47   45588554040361 P6_PRODUCT_NAME           3.2 GHz Desktop PC
+   *     139      47   45588554040361 P6_PRODUCT_DESCRIPTION    All the options, this machine is loaded!
+   *     140      47   45588554040361 P6_CATEGORY               Computer
+   *     ...
+   * 
+   * @issue #115 Only log not-null values
+   * @issue #29 Support for definging level
+   * @issue #54: Add p_item_type
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_text
-   * @param p_scope
-   * @param p_item_type Either the g_apex_item_type_... type or just the APEX page number for a specific page.
-   * @param p_log_null_items If set to false, null values won't be logged
-   * @param p_level Highest level to run at (default logger.g_debug). Example. If you set to logger.g_error it will work when both in DEBUG and ERROR modes. However if set to logger.g_debug(default) will not store values when level is set to ERROR.
+   * @param p_text Text to be added to `text` column.
+   * @param p_scope Scope to use
+   * @param p_item_type Determines what type of APEX items are logged (`g_apex_item_type_...` > all, application, page). Alternatively it can reference a page_id which will then only log items on the defined page.
+   * @param p_log_null_items If set to `false`, null values won't be logged
+   * @param p_level Highest level to run at (default `logger.g_debug`). 
+   *  Example: If set to `logger.g_error` it will work when both in `debug` and `error` modes. However if set to `logger.g_debug`(default) will not store values when `level` is set to `error`.
    */
   procedure log_apex_items(
-    p_text in varchar2 default 'Log APEX Items',
+    p_text in varchar2 default 'Log APEX Items. Query logger_logs_apex_items and filter on log_id',
     p_scope in logger_logs.scope%type default null,
     p_item_type in varchar2 default logger.g_apex_item_type_all,
     p_log_null_items in boolean default true,
@@ -2845,258 +2798,292 @@ as
     commit;
   end log_apex_items;
 
+  -- *** UTILITY FUNCTIONS ***
 
   /**
+   * `tochar` will convert the value to a string (`varchar2`). It is useful when logging items such as booleans without having to explicitly convert them.
+   *
+   * Note: `tochar` does not use the `no_op` conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).
+   * Note: Need to call this tochar instead of to_char since there will be a conflict when calling it
+   *
+   * @example
+   *
+   * select logger.tochar(sysdate)
+   * from dual;
+   * 
+   * LOGGER.TOCHAR(SYSDATE)
+   * -----------------------
+   * 13-JUN-2014 21:20:34
+   * 
+   * 
+   * -- In PL/SQL highlighting conversion from boolean to varchar2
+   * SQL> exec dbms_output.put_line(logger.tochar(true));
+   * TRUE
+   * 
+   * PL/SQL procedure successfully completed.
    *
    *
-   * Notes:
-   *  -
+   * @issue #68
    *
-   * Related Tickets:
-   *  - #73/#75: Use localtimestamp
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_unit
-   * @param p_log_in_table
+   * @author Martin D'Souza
+   * @created 07-Jun-2014
+   * @param p_value Value (in original data type)
+   * @return varchar2 String for p_value
    */
-  procedure time_start(
-    p_unit in varchar2,
-    p_log_in_table in boolean default true)
-  is
-    l_proc_name varchar2(100);
-    l_text varchar2(4000);
-    l_pad varchar2(100);
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_debug) then
-        g_running_timers := g_running_timers + 1;
-
-        if g_running_timers > 1 then
-          -- Use 'a' since lpad requires a value to pad
-          l_pad := replace(lpad('a',logger.g_running_timers,'>')||' ', 'a', null);
-        end if;
-
-        g_proc_start_times(p_unit) := localtimestamp;
-
-        l_text := l_pad||'START: '||p_unit;
-
-        if p_log_in_table then
-          ins_logger_logs(
-            p_unit_name => p_unit ,
-            p_logger_level => g_timing,
-            p_text =>l_text,
-            po_id => g_log_id);
-        end if;
-      end if;
-    $end
-  end time_start;
-
-  /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #73: Remove additional timer decrement since it was already happening in function time_stop
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_scope
-   * @param p_unit
-   */
-  procedure time_stop(
-    p_unit in varchar2,
-    p_scope in varchar2 default null)
-  is
-    l_time_string varchar2(50);
-    l_text varchar2(4000);
-    l_pad varchar2(100);
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_debug) then
-        if g_proc_start_times.exists(p_unit) then
-
-          if g_running_timers > 1 then
-            -- Use 'a' since lpad requires a value to pad
-            l_pad := replace(lpad('a',logger.g_running_timers,'>')||' ', 'a', null);
-          end if;
-
-          --l_time_string := rtrim(regexp_replace(systimestamp-(g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
-          -- Function time_stop will decrement the timers and pop the name from the g_proc_start_times array
-          l_time_string := time_stop(
-            p_unit => p_unit,
-            p_log_in_table => false);
-
-          l_text := l_pad||'STOP : '||p_unit ||' - '||l_time_string;
-
-          ins_logger_logs(
-            p_unit_name => p_unit,
-            p_scope => p_scope ,
-            p_logger_level => g_timing,
-            p_text =>l_text,
-            po_id => g_log_id);
-        end if;
-      end if;
-    $end
-  end time_stop;
-
-
-  /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #73/#75: Trim timezone from systimestamp to localtimestamp
-   *
-   * @author Tyler Muth
-   * @created ???
-   * @param p_unit
-   * @param p_scope
-   * @param p_log_in_table
-   * @return Timer string
-   */
-  function time_stop(
-    p_unit in varchar2,
-    p_scope in varchar2 default null,
-    p_log_in_table IN boolean default true)
+  function tochar(
+    p_val in number)
     return varchar2
-  is
-    l_time_string varchar2(50);
+  as
   begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_debug) then
-        if g_proc_start_times.exists(p_unit) then
+    return to_char(p_val);
+  end tochar;
 
-          l_time_string := rtrim(regexp_replace(localtimestamp - (g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
+  /**
+   * See [`tochar (p_val number)`](#tochar)
+   *
+   * @param p_val Date
+   * @return String for p_val (format `DD-MON-YYYY HH24:MI:SS`)
+   */
+  function tochar(
+    p_val in date)
+    return varchar2
+  as
+  begin
+    return to_char(p_val, gc_date_format);
+  end tochar;
 
-          g_proc_start_times.delete(p_unit);
-          g_running_timers := g_running_timers - 1;
+  /**
+   * See [`tochar (p_val number)`](#tochar)
+   *
+   * @param p_val Timestamp
+   * @return String for p_val (format `DD-MON-YYYY HH24:MI:SS:FF`)
+   */
+  function tochar(
+    p_val in timestamp)
+    return varchar2
+  as
+  begin
+    return to_char(p_val, gc_timestamp_format);
+  end tochar;
 
-          if p_log_in_table then
-            ins_logger_logs(
-              p_unit_name => p_unit,
-              p_scope => p_scope ,
-              p_logger_level => g_timing,
-              p_text => l_time_string,
-              po_id => g_log_id);
-          end if;
+  /**
+   * See [`tochar (p_val number)`](#tochar)
+   *
+   * @param p_val Timestamp with time zone
+   * @return String for p_val (format `DD-MON-YYYY HH24:MI:SS:FF TZR`)
+   */
+  function tochar(
+    p_val in timestamp with time zone)
+    return varchar2
+  as
+  begin
+    return to_char(p_val, gc_timestamp_tz_format);
+  end tochar;
 
-          return l_time_string;
+  /**
+   * See [`tochar (p_val number)`](#tochar)
+   *
+   * @param p_val Timestamp with local time zone
+   * @return String for p_val (format `DD-MON-YYYY HH24:MI:SS:FF TZR`)
+   */
+  function tochar(
+    p_val in timestamp with local time zone)
+    return varchar2
+  as
+  begin
+    return to_char(p_val, gc_timestamp_tz_format);
+  end tochar;
 
-        end if;
-      end if;
+  /**
+   * See [`tochar (p_val number)`](#tochar)
+   *
+   * @issue #119: Return null for null booleans
+   *
+   * @param p_val Boolean
+   * @return String for p_val (`TRUE` or `FALSE`)
+   */
+  function tochar(
+    p_val in boolean)
+    return varchar2
+  as
+  begin
+    return case p_val when true then 'TRUE' when false then 'FALSE' else null end;
+  end tochar;
+
+  
+  /**
+   * `sprintf` is similar to the common procedure `printf` found in many programming languages. It replaces substitution strings for a given string. Substitution strings can be either `%s` or `%s<n>` where `<n>` is a number 1~10.
+   * 
+   * The following rules are used to handle substitution strings (in order):
+   * - Replaces `%s<n>` with `p_s<n>`, regardless of order that they appear in `p_str`
+   * - Occurrences of `%s` (no number) are replaced with `p_s1..p_s10` in order that they appear in `p_str`
+   * - `%%` is escaped to `%`
+   *
+   * Note: `sprintf` does not use the `no_op` conditional compilation so it will always execute. This means that you can use outside of Logger (i.e. within your own application business logic).
+   *
+   * @example
+   *
+   * select logger.sprintf('hello %s, how are you %s', 'martin', 'today') msg
+   * from dual;
+   * 
+   * MSG
+   * -------------------------------
+   * hello martin, how are you today   
+   *
+   * -- Advance features
+   * 
+   * -- Escaping %
+   * select logger.sprintf('hello, %% (escape) %s1', 'martin') msg
+   * from dual;
+   * 
+   * MSG
+   * -------------------------
+   * hello, % (escape) martin
+   * 
+   * -- %s<n> replacement
+   * select logger.sprintf('%s1, %s2, %s', 'one', 'two') msg
+   * from dual;
+   * 
+   * MSG
+   * -------------------------
+   * one, two, one
+   * 
+   *
+   * @issue #32: Also see #59
+   * @issue #95: Remove no_op clause
+   *
+   * @author Martin D'Souza
+   * @created 15-Jun-2014
+   * @param p_str String to apply substitution strings to
+   * @param p_s1 Substitution strings (same for `2-10`)
+   * @param p_s2
+   * @param p_s3
+   * @param p_s4
+   * @param p_s5
+   * @param p_s6
+   * @param p_s7
+   * @param p_s8
+   * @param p_s9
+   * @param p_s10
+   * @return p_msg with strings replaced
+   */
+  function sprintf(
+    p_str in varchar2,
+    p_s1 in varchar2 default null,
+    p_s2 in varchar2 default null,
+    p_s3 in varchar2 default null,
+    p_s4 in varchar2 default null,
+    p_s5 in varchar2 default null,
+    p_s6 in varchar2 default null,
+    p_s7 in varchar2 default null,
+    p_s8 in varchar2 default null,
+    p_s9 in varchar2 default null,
+    p_s10 in varchar2 default null)
+    return varchar2
+  as
+    l_return varchar2(4000);
+    c_substring_regexp constant varchar2(10) := '%s';
+
+  begin
+    l_return := p_str;
+
+    -- Replace %s<n> with p_s<n>``
+    for i in 1..10 loop
+      l_return := regexp_replace(l_return, c_substring_regexp || i,
+        case
+          when i = 1 then p_s1
+          when i = 2 then p_s2
+          when i = 3 then p_s3
+          when i = 4 then p_s4
+          when i = 5 then p_s5
+          when i = 6 then p_s6
+          when i = 7 then p_s7
+          when i = 8 then p_s8
+          when i = 9 then p_s9
+          when i = 10 then p_s10
+          else null
+        end,
+        1,0,'c');
+    end loop;
+
+    $if $$logger_debug $then
+      dbms_output.put_line('Before sys.utl_lms: ' || l_return);
     $end
-  end time_stop;
+
+    -- Replace any occurences of %s with p_s<n> (in order) and escape %% to %
+    l_return := sys.utl_lms.format_message(l_return,p_s1, p_s2, p_s3, p_s4, p_s5, p_s6, p_s7, p_s8, p_s9, p_s10);
+
+    return l_return;
+
+  end sprintf;
 
 
   /**
-   *
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #73/#75: Trim timezone from systimestamp to localtimestamp
+   * Get list of CGI values as name/value padded string
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_unit
-   * @param p_scope
-   * @param p_log_in_table
-   * @return Timer in seconds
+   * @param p_show_null If true will show CGI values even if they're null
+   * @return CGI values (clob)
    */
-  function time_stop_seconds(
-    p_unit in varchar2,
-    p_scope in varchar2 default null,
-    p_log_in_table in boolean default true
-    )
-    return number
+  function get_cgi_env(
+    p_show_null in boolean default false)
+    return clob
   is
-    l_time_string varchar2(50);
-    l_seconds number;
-    l_interval interval day to second;
+    l_cgienv clob;
 
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      if ok_to_log(logger.g_debug) then
-        if g_proc_start_times.exists(p_unit) then
-          l_interval := localtimestamp - (g_proc_start_times(p_unit));
-          l_seconds := extract(day from l_interval) * 86400 + extract(hour from l_interval) * 3600 + extract(minute from l_interval) * 60 + extract(second from l_interval);
-
-          g_proc_start_times.delete(p_unit);
-          g_running_timers := g_running_timers - 1;
-
-          if p_log_in_table then
-            ins_logger_logs(
-              p_unit_name => p_unit,
-              p_scope => p_scope ,
-              p_logger_level => g_timing,
-              p_text => l_seconds,
-              po_id => g_log_id);
-          end if;
-
-          return l_seconds;
-
+    $if $$no_op is null or not $$no_op $then
+      procedure append_cgi_env(
+        p_name in varchar2,
+        p_val in varchar2)
+      is
+        r_pad number := 30;
+      begin
+        if p_show_null or p_val is not null then
+          l_cgienv := l_cgienv || rpad(p_name,r_pad,' ')||': '||p_val||gc_cflf;
         end if;
-      end if;
+      end append_cgi_env;
     $end
-  end time_stop_seconds;
 
-
-  /**
-   * Resets all timers
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
-   *
-   * @author Tyler Muth
-   * @created ???
-   */
-  procedure time_reset
-  is
   begin
     $if $$no_op $then
-      null;
+      return null;
     $else
-      if ok_to_log(logger.g_debug) then
-        g_running_timers := 0;
-        g_proc_start_times.delete;
-      end if;
+      for i in 1..nvl(owa.num_cgi_vars,0) loop
+        append_cgi_env(
+          p_name => owa.cgi_var_name(i),
+          p_val => owa.cgi_var_val(i));
+      end loop;
+
+      return l_cgienv;
     $end
-  end time_reset;
+  end get_cgi_env;
+
+
 
   /**
-   * Returns Global or User preference
-   * User preference is only valid for LEVEL and INCLUDE_CALL_STACK
+   * Returns the preference from `logger_prefs`. If p_pref_type is not defined then the system level preferences will be returned.
+   *
+   * Returns Global or User preference depending on current `client_identifier` (user preferences take precedence over global preferences)
+   * User preference is only valid for `level` and `include_call_stack`
    *  - If a user setting exists, it will be returned, if not the system level preference will be return
    *
    * Updates
    *  - 2.0.0: Added user preference support
    *  - 2.1.2: Fixed issue when calling set_level with the same client_id multiple times
    *
-   * Related Tickets:
-   *  - #127: Added logger_prefs.pref_type
+   * @example
+   *
+   * dbms_output.put_line('Logger level: ' || logger.get_pref('LEVEL'));
+   *
+   * @issue #127: Added logger_prefs.pref_type
    *
    * @author Tyler Muth
    * @created ???
    *
-   * @param p_pref_name
+   * @param p_pref_name Preference to get value for
    * @param p_pref_type Namespace for preference
+   * @return Prefence value
    */
   function get_pref(
     p_pref_name in logger_prefs.pref_name%type,
@@ -3120,7 +3107,7 @@ as
       return null;
     $else
       $if $$logger_debug $then
-        dbms_output.put_line(l_scope || ' select pref');
+        dbms_output.put_line(l_scope || '| p_pref_type: ' || p_pref_type || ' p_pref_name: ' || p_pref_name);
       $end
 
       l_client_id := sys_context('userenv','client_identifier');
@@ -3157,6 +3144,10 @@ as
         )
       )
       where rn = 1;
+
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ':' || l_pref_value);
+      $end
       return l_pref_value;
     $end
 
@@ -3167,22 +3158,31 @@ as
       raise;
   end get_pref;
 
-
   /**
-   * Sets a preference
-   * If it does not exist, it will insert one
+   * Sets a preference both custom and application (`LOGGER`) based preferences.
    *
-   * Notes:
-   *  - Does not support setting system preferences
+   * For application sttings use `p_pref_type => 'LOGGER'.
    *
-   * Related Tickets:
-   *  - #127
+   * In some cases you may want to store custom preferences in the `logger_prefs` table. A use case for this would be when creating a plugin that needs to reference some parameters.
+   *
+   * This procedure allows you to leverage the `logger_prefs` table to store your custom preferences. To avoid any naming conflicts with Logger, you must use a type (defined in `p_pref_type`). You can not use the type `LOGGER` as it is reserved for Logger system preferences.
+   *
+   * `set_pref` will either create or udpate a value. Values must contain data. If not, use DEL_PREF to delete unused preferences.
+   *
+   * @example
+   *
+   * exec logger.set_pref(
+   *   p_pref_type => 'CUSTOM',
+   *   p_pref_name => 'MY_PREF',
+   *   p_pref_value => 'some value');
+   *
+   * @issue #127
    *
    * @author Alex Nuijten / Martin D'Souza
    * @created 24-APR-2015
-   * @param p_pref_type
-   * @param p_pref_name
-   * @param p_pref_value
+   * @param p_pref_type Type of preference. Use your own name space to avoid conflicts with Logger. Types will automatically be converted to uppercase
+   * @param p_pref_name Preference to get value for. Must be prefixed with `CUST_`. Value will be created or updated. `pref_name` will be stored as uppercase.
+   * @param p_pref_value Prefence value
    */
   procedure set_pref(
     p_pref_type in logger_prefs.pref_type%type,
@@ -3191,14 +3191,73 @@ as
   as
     l_pref_type logger_prefs.pref_type%type := trim(upper(p_pref_type));
     l_pref_name logger_prefs.pref_name%type := trim(upper(p_pref_name));
+
+    l_err_msg varchar2(4000);
   begin
 
     $if $$no_op $then
       null;
     $else
+      logger.g_can_update_logger_prefs := true;
+
       if l_pref_type = logger.g_pref_type_logger then
-        raise_application_error(-20001, 'Can not set ' || l_pref_type || '. Reserved for Logger');
-      end if;
+        -- #184 Need a way to set some Logger Prefs
+        -- To help simplify things will allow some calls to go thru / filter values here so one place to set values
+
+        -- Validate LOGGER inputs
+        if p_pref_value is null then
+          l_err_msg := 'must have a value';
+        elsif l_pref_name not in (
+          gc_pref_level,
+          gc_pref_include_call_stack,
+          gc_pref_protect_admin_procs,
+          gc_pref_install_schema,
+          gc_pref_purge_after_days,
+          gc_pref_purge_min_level,
+          gc_pref_logger_version,
+          gc_pref_client_id_expire_hours,
+          gc_pref_logger_debug,
+          gc_pref_plugin_fn_error,
+          gc_pref_global_context_name
+        ) then
+          l_err_msg := 'unknown LOGGER preference';
+        elsif 1=1
+          and l_pref_name in (gc_pref_logger_debug, gc_pref_include_call_stack, gc_pref_protect_admin_procs) 
+          and p_pref_value not in ('TRUE', 'FALSE') then
+          l_err_msg := 'must be TRUE or FALSE';
+        elsif l_pref_name in (gc_pref_client_id_expire_hours, gc_pref_purge_after_days) and not is_number(p_pref_value) then
+          l_err_msg := 'must be a number';
+        elsif l_pref_name in (gc_pref_purge_min_level, gc_pref_level) and not is_valid_level(p_level => p_pref_value) then
+          l_err_msg := 'must be one of the following values: ' || get_all_level_names;
+        elsif l_pref_name in (gc_pref_install_schema, gc_pref_logger_version, gc_pref_global_context_name) then
+          l_err_msg := 'can not change this value';
+        elsif 1=1
+          and l_pref_name = gc_pref_plugin_fn_error 
+          -- Ensure valid packge.function name
+          and (1=2
+            or p_pref_value != 'NONE'
+            or not regexp_like(p_pref_value, '^(([[:digit:]]|[[:lower:]]|_)+\.)?([[:digit:]]|[[:lower:]]|_)+$', 'i')
+           ) then
+          l_err_msg := 'invalid method name. Should be package.function name or use NONE';
+        end if;
+
+        assert(l_err_msg is null, logger.sprintf('Preference LOGGER.%s1: %s2', p_pref_name, l_err_msg));
+
+        -- Validations should have passed at this point
+        -- Need to handle special preference settings
+        -- After each call to special preference go to end of method (if applicable) as don't want to update logger_prefs from here
+        if l_pref_name = gc_pref_level then
+          logger.set_level(p_level => p_pref_value);
+          goto end_method;
+        elsif l_pref_name = gc_pref_include_call_stack then
+          save_global_context(
+            p_attribute => gc_ctx_attr_include_call_stack,
+            p_value => p_pref_value,
+            p_client_id => null); -- Set global context
+          -- Don't go to end as we need to update the prefs table
+        end if;
+
+      end if; -- l_pref_type = logger.g_pref_type_logger
 
       merge into logger_prefs p
       using (select l_pref_type pref_type, l_pref_name pref_name, p_pref_value pref_value
@@ -3213,24 +3272,36 @@ as
         insert (pref_type, pref_name ,pref_value)
       values
         (args.pref_type, args.pref_name ,args.pref_value);
+
+      <<end_method>>
+      logger.g_can_update_logger_prefs := false;
     $end -- $no_op
 
+  exception
+    when others then
+      logger.g_can_update_logger_prefs := false;
+      raise;
   end set_pref;
 
+
+
   /**
-   * Removes a Preference
+   * Removes a Preference 
    *
-   * Notes:
-   *  - Does not support setting system preferences
+   * Notes: Does not support removing system preferences
    *
-   * Related Tickets:
-   *  - #127
+   * @example
+   *
+   * exec logger.del_pref(
+   *   p_pref_type => 'CUSTOM'
+   *   p_pref_name => 'MY_PREF');
+   *
+   * @issue #127
    *
    * @author Alex Nuijten / Martin D'Souza
    * @created 30-APR-2015
-   *
-   * @param p_pref_type
-   * @param p_pref_name
+   * @param p_pref_type Namepsace / type of preference.
+   * @param p_pref_name Custom preference to delete.
    */
   procedure del_pref(
     p_pref_type in logger_prefs.pref_type%type,
@@ -3255,18 +3326,14 @@ as
 
 
   /**
-   * Purges logger_logs data
+   * Purges logger_logs data except based on `p_purge_min_level`
    *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #48 Support for overloading
+   * @issue #48: Support for overloading
    *
    * @author Martin D'Souza
    * @created 14-Jun-2014
-   * @param p_purge_after_days
-   * @param p_purge_min_level
+   * @param p_purge_after_days Purge entries older than `n` days. If `null` preference `gc_pref_purge_after_days` will be used
+   * @param p_purge_min_level Minimum level to purge entries. For example if set to `logger.g_information` then `information`, `debug`, `timing`, `sys_context`, and `apex` logs will be deleted.
    */
   procedure purge(
     p_purge_after_days in number default null,
@@ -3295,13 +3362,7 @@ as
 
 
   /**
-   * Wrapper for Purge (to accept number for purge_min_level)
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
+   * Wrapper for `purge` (to accept number for purge_min_level)
    *
    * @author Tyler Muth
    * @created ???
@@ -3325,13 +3386,11 @@ as
 
 
   /**
-   * Purges all records that aren't marked as permanent
+   * Purges all records that aren't marked as `permanent`
    *
-   * Notes:
-   *  -
+   * @example
    *
-   * Related Tickets:
-   *  -
+   * exec logger.purge_all;
    *
    * @author Tyler Muth
    * @created ???
@@ -3353,17 +3412,32 @@ as
 
 
   /**
-   * Displays Logger's current status
+   * Displays Logger's current status and configuration settings
+   * If run in SQLPlus `dbms_output` will be used.
+   * If run in a web session (ex: APEX) `htp.p` will be used
    *
-   * Notes:
-   *  -
+   * @example
    *
-   * Related Tickets:
-   *  -
+   * set serveroutput on
+   * exec logger.status
+   * 
+   * Project Home Page    : https://github.com/oraopensource/logger/
+   * Logger Version       : 2.0.0.a01
+   * Debug Level          : DEBUG
+   * Capture Call Stack     : TRUE
+   * Protect Admin Procedures : TRUE
+   * APEX Tracing       : Disabled
+   * SCN Capture        : Disabled
+   * Min. Purge Level     : DEBUG
+   * Purge Older Than     : 7 days
+   * Pref by client_id expire : 12 hours
+   * For all client info see  : logger_prefs_by_client_id
+   * 
+   * PL/SQL procedure successfully completed.
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_output_format SQL-DEVELOPER | HTML | DBMS_OUPUT
+   * @param p_output_format `SQL-DEVELOPER`, `HTML`, or `DBMS_OUPUT`
    */
   procedure status(
     p_output_format in varchar2 default null) -- SQL-DEVELOPER | HTML | DBMS_OUPUT
@@ -3443,6 +3517,12 @@ as
       $if $$rac_lt_11_2  $then
         display_output('RAC pre-11.2 Code','TRUE');
       $end
+      
+      $if $$logger_context $then
+        display_output('Using context', 'TRUE');
+      $else
+        display_output('Using context', 'FALSE');
+      $end
 
       -- #46 Only display plugins if enabled
       $if $$logger_plugin_error $then
@@ -3484,326 +3564,167 @@ as
 
 
   /**
-   * Sets the logger level
+   * Converts string names to text value
    *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  - #60 Allow security check to be bypassed for client specific logging level
-   *  - #48 Allow of numbers to be passed in p_level. Did not overload (see ticket comments as to why)
-   *  - #110 Clear context values when level changes globally
-   *  - #29 If p_level is deprecated, set to DEBUG
+   * Changes
+   *  - 2.1.0: Start to use global variables and correct numbers
    *
    * @author Tyler Muth
    * @created ???
    *
-   * @param p_level Valid values: OFF,PERMANENT,ERROR,WARNING,INFORMATION,DEBUG,TIMING
-   * @param p_client_id Optional: If defined, will set the level for the given client identifier. If null will affect global settings
-   * @param p_include_call_stack Optional: Only valid if p_client_id is defined Valid values: TRUE, FALSE. If not set will use the default system pref in logger_prefs.
-   * @param p_client_id_expire_hours If p_client_id, expire after number of hours. If not defined, will default to system preference PREF_BY_CLIENT_ID_EXPIRE_HOURS
+   * @param p_level String representation of level
+   * @return Returns the number representing the given level (string). `-1` if not found
    */
-  procedure set_level(
-    p_level in varchar2 default logger.g_debug_name,
-    p_client_id in varchar2 default null,
-    p_include_call_stack in varchar2 default null,
-    p_client_id_expire_hours in number default null
-  )
+  function convert_level_char_to_num(
+    p_level in varchar2) 
+    return number
   is
-    l_level varchar2(20);
-    l_ctx varchar2(2000);
-    l_include_call_stack varchar2(255);
-    l_client_id_expire_hours number;
-    l_expiry_date logger_prefs_by_client_id.expiry_date%type;
-
-    l_id logger_logs.id%type;
-    pragma autonomous_transaction;
+    l_level number;
   begin
     $if $$no_op $then
-      raise_application_error (-20000,
-          'Either the NO-OP version of Logger is installed or it is compiled for NO-OP,  so you cannot set the level.');
+      return null;
     $else
-      l_level := replace(upper(p_level),' ');
-
-      if is_number(p_str => l_level) then
-        l_level := convert_level_num_to_char(p_level => p_level);
-      end if;
-
-      l_include_call_stack := nvl(trim(upper(p_include_call_stack)), get_pref(logger.gc_pref_include_call_stack));
-
-      assert(
-          l_level in (g_off_name, g_permanent_name, g_error_name, g_warning_name, g_information_name, g_debug_name, g_timing_name, g_sys_context_name, g_apex_name),
-        '"LEVEL" must be one of the following values: ' ||
-          g_off_name || ', ' || g_permanent_name || ', ' || g_error_name || ', ' || g_warning_name || ', ' ||
-          g_information_name || ', ' || g_debug_name || ', ' || g_timing_name || ', ' ||
-          g_sys_context_name || ', ' || g_apex_name );
-      assert(l_include_call_stack in ('TRUE', 'FALSE'), 'l_include_call_stack must be TRUE or FALSE');
-
-      -- #60 Allow security check to be bypassed for client specific logging level
-      if p_client_id is not null or admin_security_check then
-        l_ctx := 'Host: '||sys_context('USERENV','HOST');
-        l_ctx := l_ctx || ', IP: '||sys_context('USERENV','IP_ADDRESS');
-        l_ctx := l_ctx || ', TERMINAL: '||sys_context('USERENV','TERMINAL');
-        l_ctx := l_ctx || ', OS_USER: '||sys_context('USERENV','OS_USER');
-        l_ctx := l_ctx || ', CURRENT_USER: '||sys_context('USERENV','CURRENT_USER');
-        l_ctx := l_ctx || ', SESSION_USER: '||sys_context('USERENV','SESSION_USER');
-
-        -- #29 Deprecate old levels. Log and set to DEBUG
-        if l_level in (logger.g_apex_name, logger.g_sys_context_name, logger.g_timing_name)  then
-          logger.ins_logger_logs(
-            p_logger_level => logger.g_warning,
-            p_text =>
-              logger.sprintf('Logger level: %s1 is deprecated. Set for client_id %s2. Automatically setting to %s3', l_level, nvl(p_client_id, '<global>'), logger.g_debug_name),
-            po_id => l_id);
-
-          l_level := logger.g_debug_name;
-        end if;
-
-
-        -- Separate updates/inserts for client_id or global settings
-        if p_client_id is not null then
-          l_client_id_expire_hours := nvl(p_client_id_expire_hours, get_pref(logger.gc_pref_client_id_expire_hours));
-          l_expiry_date := sysdate + l_client_id_expire_hours/24;
-
-          merge into logger_prefs_by_client_id ci
-          using (select p_client_id client_id from dual) s
-            on (ci.client_id = s.client_id)
-          when matched then update
-            set logger_level = l_level,
-              include_call_stack = l_include_call_stack,
-              expiry_date = l_expiry_date,
-              created_date = sysdate
-          when not matched then
-            insert(ci.client_id, ci.logger_level, ci.include_call_stack, ci.created_date, ci.expiry_date)
-            values(p_client_id, l_level, l_include_call_stack, sysdate, l_expiry_date)
-          ;
-
-        else
-          -- Global settings
-          update logger_prefs
-          set pref_value = l_level
-          where 1=1
-            and pref_type = logger.g_pref_type_logger
-            and pref_name = logger.gc_pref_level;
-        end if;
-
-        -- #110 Need to reset all contexts so that level is reset for sessions where client_identifier is defined
-        -- This is required for global changes since sessions with client_identifier set won't be properly updated.
-        if p_client_id is null then
-          logger.null_global_contexts;
-        end if;
-
-        logger.save_global_context(
-          p_attribute => gc_ctx_attr_level,
-          p_value => logger.convert_level_char_to_num(l_level),
-          p_client_id => p_client_id); -- Note: if p_client_id is null then it will set for global`
-
-        -- Manual insert to ensure that data gets logged, regardless of logger_level
-        logger.ins_logger_logs(
-          p_logger_level => logger.g_information,
-          p_text => 'Log level set to ' || l_level || ' for client_id: ' || nvl(p_client_id, '<global>') || ', include_call_stack=' || l_include_call_stack || ' by ' || l_ctx,
-          po_id => l_id);
-
-      end if; -- p_client_id is not null or admin_security_check
+      case p_level
+        when g_off_name then l_level := g_off;
+        when g_permanent_name then l_level := g_permanent;
+        when g_error_name then l_level := g_error;
+        when g_warning_name then l_level := g_warning;
+        when g_information_name then l_level := g_information;
+        when g_debug_name then l_level := g_debug;
+        when g_timing_name then l_level := g_timing;
+        when g_sys_context_name then l_level := g_sys_context;
+        when g_apex_name then l_level := g_apex;
+        else l_level := -1;
+      end case;
     $end
-    commit;
-  end set_level;
+
+    return l_level;
+  end convert_level_char_to_num;
 
 
   /**
-   * Unsets a logger level for a given client_id
-   * This will only unset for client specific logger levels
-   * Note: An explicit commit will occur in this procedure
+   * Returns the time difference (in nicely formatted string) of p_date compared to now (sysdate).
    *
-   * @author Martin D'Souza
-   * @created 6-Apr-2013
-   *
-   * @param p_client_id Client identifier (case sensitive) to unset logger level in.
-   */
-  procedure unset_client_level(p_client_id in varchar2)
-  as
-    pragma autonomous_transaction;
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      assert(p_client_id is not null, 'p_client_id is a required value');
-
-      -- Remove from client specific table
-      delete from logger_prefs_by_client_id
-      where client_id = p_client_id;
-
-      -- Remove context values
-      dbms_session.clear_context(
-       namespace => g_context_name,
-       client_id => p_client_id,
-       attribute => gc_ctx_attr_level);
-
-      dbms_session.clear_context(
-       namespace => g_context_name,
-       client_id => p_client_id,
-       attribute => gc_ctx_attr_include_call_stack);
-
-    $end
-
-    commit;
-  end unset_client_level;
-
-
-  /**
-   * Unsets client_level that are stale (i.e. past thier expiry date)
-   *
-   * @author Martin D'Souza
-   * @created 7-Apr-2013
-   *
-   * @param p_unset_after_hours If null then preference UNSET_CLIENT_ID_LEVEL_AFTER_HOURS
-   */
-  procedure unset_client_level
-  as
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      for x in (
-        select client_id
-        from logger_prefs_by_client_id
-        where sysdate > expiry_date) loop
-
-        unset_client_level(p_client_id => x.client_id);
-      end loop;
-    $end
-  end unset_client_level;
-
-
-  /**
-   * Unsets all client specific preferences
-   * An implicit commit will occur as unset_client_level makes a commit
-   *
-   * @author Martin D'Souza
-   * @created 7-Apr-2013
-   *
-   */
-  procedure unset_client_level_all
-  as
-  begin
-    $if $$no_op $then
-      null;
-    $else
-      for x in (select client_id from logger_prefs_by_client_id) loop
-        unset_client_level(p_client_id => x.client_id);
-      end loop;
-    $end
-  end unset_client_level_all;
-
-
-  /**
-   * Displays commonly used dbms_output SQL*Plus settings
-   *
-   * Notes:
-   *  -
-   *
-   * Related Tickets:
-   *  -
    *
    * @author Tyler Muth
    * @created ???
+   * @param p_date
+   * @return formatting string
    */
-  procedure sqlplus_format
+  function date_text_format (p_date in date)
+    return varchar2
+  as
+  begin
+    $if $$no_op $then
+      return null;
+    $else
+      return date_text_format_base(
+        p_date_start => p_date,
+        p_date_stop => sysdate);
+    $end
+  end date_text_format;
+
+  
+  /**
+   * Debugging issues with a string that contains control characters such as carriage returns, line feeds and tabs that can be very difficult.
+   * The sql `dump()` function is great for this, but the output is a bit hard to read as it outputs the character codes for each character. 
+   * You end up comparing the character code to an ascii table to figure out what it is. 
+   *
+   * This function and the procedure `log_character_codes` makes it easier as it lines up the characters in the original string under the corresponding character codes from dump. 
+   * Additionally, all tabs are replaced with `^` and all other control characters such as `carriage returns` and `line feeds` are replaced with `~`. 
+   *
+   * @example
+   *
+   * select logger.get_character_codes('Hello World'||chr(9)||'Foo'||chr(13)||chr(10)||'Bar') char_codes
+   * from dual;
+   * 
+   * CHAR_CODES
+   * ----------------------------------------------------------------------------------
+   * Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
+   *   72,101,108,108,111, 32, 87,111,114,108,100,  9, 70,111,111, 13, 10, 66, 97,114
+   *    H,  e,  l,  l,  o,   ,  W,  o,  r,  l,  d,  ^,  F,  o,  o,  ~,  ~,  B,  a,  r   
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_string String to retrieve character codes for.
+   * @param p_show_common_codes Display legend of common character codes.
+   * @return String with character codes.
+   */
+  function get_character_codes(
+    p_string in varchar2,
+    p_show_common_codes in boolean default true)
+    return varchar2
   is
+    l_string  varchar2(32767);
+    l_dump    varchar2(32767);
+    l_return  varchar2(32767);
   begin
-    execute immediate 'begin dbms_output.enable(1000000); end;';
-    dbms_output.put_line('set linesize 200');
-    dbms_output.put_line('set pagesize 100');
+    -- replace tabs with ^
+    l_string := replace(p_string,chr(9),'^');
+    -- replace all other control characters such as carriage return / line feeds with ~
+    l_string := regexp_replace(l_string,'[[:cntrl:]]','~',1,0,'m');
 
-    dbms_output.put_line('column id format 999999');
-    dbms_output.put_line('column text format a75');
-    dbms_output.put_line('column call_stack format a100');
-    dbms_output.put_line('column extra format a100');
+    select dump(p_string) into l_dump from dual;
 
-  end sqlplus_format;
+    l_dump  := regexp_replace(l_dump,'(^.+?:)(.*)','\2',1,0); -- get everything after the :
+    l_dump  := ','||l_dump||','; -- leading and trailing commas
+    l_dump  := replace(l_dump,',',',,'); -- double the commas. this is for the regex.
+    l_dump  := regexp_replace(l_dump,'(,)([[:digit:]]{1})(,)','\1  \2\3',1,0); -- lpad all single digit numbers out to 3
+    l_dump  := regexp_replace(l_dump,'(,)([[:digit:]]{2})(,)','\1 \2\3',1,0);  -- lpad all double digit numbers out to 3
+    l_dump  := ltrim(replace(l_dump,',,',','),','); -- remove the double commas
+    l_dump  := lpad(' ',(5-instr(l_dump,',')),' ')||l_dump;
+
+    -- replace every individual character with 2 spaces, itself and a comma so it lines up with the dump output
+    l_string := ' '||regexp_replace(l_string,'(.){1}','  \1,',1,0);
+
+    l_return := rtrim(l_dump,',') || chr(10) || rtrim(l_string,',');
+
+    if p_show_common_codes then
+      l_return := 'Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab'||chr(10) ||l_return;
+    end if;
+
+    return l_return;
+
+  end get_character_codes;
+
+
+
+    -- Handle Parameters
 
   /**
-   * Converts parameter to varchar2
+   * Logger has wrapper functions to quickly and easily log parameters. All primary `log` procedures take in a fourth parameter (`p_params`) to support logging a parameter array. The values are explicitly converted to strings so you don't need to convert them. The parameter values will be stored in the extra column.
+   * 
+   * Note: Append parameter to table of parameters
+   * Note: Nothing is actually logged in this procedure
    *
-   * Notes:
-   *  - As this function could be useful for non-logging purposes will not apply a NO_OP to it for conditional compilation
-   *  - Need to call this tochar instead of to_char since there will be a conflict when calling it
+   * @example
    *
-   * Related Tickets:
-   *  - #68
+   * create or replace procedure p_demo_function(
+   *   p_empno in emp.empno%type,
+   *   p_ename in emp.ename%type)
+   * as
+   *   l_scope logger_logs.scope%type := 'p_demo_function';
+   *   l_params logger.tab_param;
+   * begin
+   *   logger.append_param(l_params, 'p_empno', p_empno); -- Parameter name and value just stored in PL/SQL array and not logged yet
+   *   logger.append_param(l_params, 'p_ename', p_ename); -- Parameter name and value just stored in PL/SQL array and not logged yet
+   *   logger.log('START', l_scope, null, l_params); -- All parameters are logged at this point  
+   *   -- ...
+   * exception
+   *   when others then
+   *     logger.log_error('Unhandled Exception', l_scope, null, l_params);
+   * end p_demo_function;
+   * /   
    *
-   * @author Martin D'Souza
-   * @created 07-Jun-2014
-   * @param p_value
-   * @return varchar2 value for p_value
-   */
-  function tochar(
-    p_val in number)
-    return varchar2
-  as
-  begin
-    return to_char(p_val);
-  end tochar;
-
-  function tochar(
-    p_val in date)
-    return varchar2
-  as
-  begin
-    return to_char(p_val, gc_date_format);
-  end tochar;
-
-  function tochar(
-    p_val in timestamp)
-    return varchar2
-  as
-  begin
-    return to_char(p_val, gc_timestamp_format);
-  end tochar;
-
-  function tochar(
-    p_val in timestamp with time zone)
-    return varchar2
-  as
-  begin
-    return to_char(p_val, gc_timestamp_tz_format);
-  end tochar;
-
-  function tochar(
-    p_val in timestamp with local time zone)
-    return varchar2
-  as
-  begin
-    return to_char(p_val, gc_timestamp_tz_format);
-  end tochar;
-
-  -- #119: Return null for null booleans
-  function tochar(
-    p_val in boolean)
-    return varchar2
-  as
-  begin
-    return case p_val when true then 'TRUE' when false then 'FALSE' else null end;
-  end tochar;
-
-
-
-  -- Handle Parameters
-
-  /**
-   * Append parameter to table of parameters
-   * Nothing is actually logged in this procedure
-   * This procedure is overloaded
    *
-   * Related Tickets:
-   *  - #67: Updated to reference to_char functions
+   * @issue #67: Updated to reference to_char functions
    *
    * @author Martin D'Souza
    * @created 19-Jan-2013
    *
    * @param p_params Table of parameters (param will be appended to this)
-   * @param p_name Name
-   * @param p_val Value in its format. Will be converted to string
+   * @param p_name Name of the parameter
+   * @param p_val Value (in original data type / will be converted to string).
    */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
@@ -3822,6 +3743,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3836,6 +3764,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3850,6 +3785,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3864,6 +3806,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3878,6 +3827,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3892,6 +3848,13 @@ as
     $end
   end append_param;
 
+  /**
+   * See [`append_param (varchar2)`](#append_param)
+   *
+   * @param p_params
+   * @param p_name
+   * @param p_val
+   */
   procedure append_param(
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
@@ -3908,29 +3871,188 @@ as
 
 
   /**
-   * Handles inserts into LOGGER_LOGS.
+   * Determines if the statement can be stored in LOGGER_LOGS
    *
-   * Replaces trigger for both performance issues and to be a single location for all insert statements
+   * Though Logger internally handles when a statement is stored in the `logger_logs` table there may be situations where you need to know if `logger` will log a statement before calling `logger`. This is useful when doing an expensive operation just to log the data.
+   * 
+   * A classic example is looping over an array for the sole purpose of logging the data. In this case, there's no reason why the code should perform the additional computations when logging is disabled for a certain level.
    *
-   * autonomous_transaction so commit will be performed after insert
+   * `ok_to_log` will also factor in client specific logging settings.
+   *
+   * Note: `ok_to_log` is not something that should be used frequently as all calls to `logger` run this command internally.
+   * Note: `ok_to_log` should not be used for one-off log commands. This defeats the whole purpose of having the various log commands. For example ok_to_log should not be used in the following way:
+   *
+   * @example
+   * declare
+   *   type typ_array is table of number index by pls_integer;
+   *   l_array typ_array;
+   * begin
+   *   -- Load test data
+   *   for x in 1..100 loop
+   *     l_array(x) := x;
+   *   end loop;
+   *
+   *   -- Only log if logging is enabled
+   *   if logger.ok_to_log(logger.g_debug) then
+   *     for x in 1..l_array.count loop
+   *       logger.log(l_array(x));
+   *     end loop;
+   *   end if;
+   *  end;
+   *  /
+   *
+   * -- ok_to_log should not be used for one-off log commands. 
+   * -- This defeats the whole purpose of having the various log commands. 
+   * -- For example ok_to_log should NOT be used in the following way:
+   * ...
+   * if logger.ok_to_log(logger.g_debug) then
+   *  logger.log('test');
+   * end if;
+   * ...
+   *
+   * @issue #44: Expose publically
+   *
+   * @author Tyler Muth
+   * @created ???
+   *
+   * @param p_level Level (number)
+   * @return True of statement can be logged to LOGGER_LOGS
+   */
+  function ok_to_log(p_level in number)
+    return boolean
+    $if 1=1
+      and ($$rac_lt_11_2 or not $$logger_context)
+      and not dbms_db_version.ver_le_10_2
+      and ($$no_op is null or not $$no_op) $then
+        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+    $end
+  is
+    l_level number;
+    l_level_char varchar2(50);
+
+    $if $$logger_debug $then
+      l_scope varchar2(30) := 'ok_to_log';
+    $end
+
+  begin
+    $if $$no_op $then
+      return false;
+    $else
+
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ': START');
+      $end
+
+      $if $$rac_lt_11_2 or not $$logger_context $then
+        $if $$logger_debug $then
+          dbms_output.put_line(l_scope || ': calling get_level_number');
+        $end
+        l_level := get_level_number;
+      $else
+        l_level := sys_context(g_context_name,gc_ctx_attr_level);
+        $if $$logger_debug $then
+          dbms_output.put_line(l_scope || ': l_level (from context): ' || l_level);
+        $end
+
+        if l_level is null then
+          $if $$logger_debug $then
+            dbms_output.put_line(l_scope || ': level was null, getting and setting in context');
+          $end
+
+          l_level := get_level_number;
+
+          -- TODO mdsouza: bug:??? Should only user p_client_id if the current value is found in the client_prefs table
+          save_global_context(
+            p_attribute => gc_ctx_attr_level,
+            p_value => l_level,
+            p_client_id => sys_context('userenv','client_identifier'));
+        end if;
+      $end
+
+      if l_level >= p_level then
+        return true;
+      else
+        return false;
+      end if;
+   $end
+  end ok_to_log;
+
+
+  /**
+   * See previous `ok_to_log` example
+   *
+   * @author Martin D'Souza
+   * @created 25-Jul-2013
+   *
+   * @param p_level Level (Name)
+   * @return True of log statements for that level or below will be logged
+   */
+  function ok_to_log(p_level in varchar2)
+    return boolean
+  as
+  begin
+    $if $$no_op $then
+      return false;
+    $else
+      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level));
+    $end
+  end ok_to_log;
+
+
+    /**
+   * Similar to `ok_to_log`, this procedure should be used very infrequently as the main Logger procedures should handle everything that is required for quickly logging information.
+   *
+   * As part of the `2.1.0` release, the trigger on `logger_logs` was removed for both performance and other issues. Though inserting directly to the `logger_logs` table is not a supported feature of Logger, you may have some code that does a direct insert. The primary reason that a manual insert into `logger_logs` was done was to obtain the `id` column for the log entry.
+   *
+   * To help prevent any issues with backwards compatibility, `ins_logger_logs` has been made publicly accessible to handle any inserts into `logger_logs`. This is a supported procedure and any manual insert statements will need to be modified to use this procedure instead.
+   *
+   * In most situations you should **not** be calling this procedure and use the `logger.log` procedures instead
+   * 
+   * Important things to know about `ins_logger_logs`:
+   * - It does not check the Logger `level`. This means it will always insert into `logger_logs`. It is also an `autonomous transaction` procedure so a commit is always performed, however it will not affect the current session.
+   * - Plugins will not be executed when calling this procedure. If you have critical processes which leverage plugin support you should use the proper `log` function instead.
+   *
+   * @example
+   * 
+   * set serveroutput on
+   * 
+   * declare
+   *   l_id logger_logs.id%type;
+   * begin
+   *   -- Note: Commented out parameters not used for this demo (but still accessible via API)
+   *   logger.ins_logger_logs(
+   *     p_logger_level => logger.g_debug,
+   *     p_text => 'Custom Insert',
+   *     p_scope => 'demo.logger.custom_insert',
+   * --    p_call_stack => ''
+   *     p_unit_name => 'Dynamic PL/SQL',
+   * --    p_line_no => ,
+   * --    p_extra => ,
+   *     po_id => l_id
+   *   );
+   * 
+   *   dbms_output.put_line('ID: ' || l_id);
+   * end;
+   * /
+   * 
+   * ID: 2930650
    *
    * @author Martin D'Souza
    * @created 30-Jul-2013
    *
-   * Related Issues
-   *  - #31: Initial ticket
-   *  - #51: Added SID column
-   *  - #70: Fixed missing no_op flag
-   *  - #109: Fix length check for multibyte characters
+   * @issue #31: Initial ticket
+   * @issue #51: Added SID column
+   * @issue #70: Fixed missing no_op flag
+   * @issue #109: Fix length check for multibyte characters
    *
-   * @param p_logger_level
+   * @param p_logger_level Logger level. See Constants section for list of variables to chose from.
    * @param p_text
    * @param p_scope
-   * @param p_call_stack
-   * @param p_unit_name
-   * @param p_line_no
-   * @param p_extra
-   * @param po_id ID entered into logger_logs for this record
+   * @param p_call_stack PL/SQL call stack
+   * @param p_unit_name Unit name (this is usually the calling procedure)
+   * @param p_line_no Line number
+   * @param p_extra `clob`
+   * @param po_id `id` entered into `logger_logs` for this record
    */
   procedure ins_logger_logs(
     p_logger_level in logger_logs.logger_level%type,
@@ -4010,112 +4132,588 @@ as
 
 
   /**
-   * Does string replacement similar to C's sprintf
+   * Sets the logger level (for bboth system and client logging levels.)
    *
-   * Notes:
-   *  - Uses the following replacement algorithm (in following order)
-   *    - Replaces %s<n> with p_s<n>
-   *    - Occurrences of %s (no number) are replaced with p_s1..p_s10 in order that they appear in text
-   *    - %% is escaped to %
-   *  - As this function could be useful for non-logging purposes will not apply a NO_OP to it for conditional compilation
+   * Logger allows you to configure both system logging levels and client specific logging levels. If a client specific logging level is defined, it will override the system level configuration. If no client level is defined Logger will defautl to the system level configuration.
    *
-   * Related Tickets:
-   *  - #32: Also see #59
-   *  - #95: Remove no_op clause
+   * Prior to version 2.0.0 Logger only supported a "global" logger level. The primary goal of this approach was to enable Logger at `debug` level for development environments, then change it to `error` level in production environments so the logs did not slow down the system. Over time developers start to find that in some situations they needed to see what a particular user / session was doing in production. Their only option was to enable Logger for the entire system which could potentially slow everyone down.
+   * 
+   * Starting in version 2.0.0 you can now specify the logger level (along with call stack setting) by specifying the `client_identifier`. If not explicitly unset, client specific configurations will expire after a set period of time.
    *
-   * @author Martin D'Souza
-   * @created 15-Jun-2014
-   * @param p_str Messsage to format using %s and %d replacement strings
-   * @param p_s1
-   * @param p_s2
-   * @param p_s3
-   * @param p_s4
-   * @param p_s5
-   * @param p_s6
-   * @param p_s7
-   * @param p_s8
-   * @param p_s9
-   * @param p_s10
-   * @return p_msg with strings replaced
+   * The following query shows all the current client specific log configurations:
+   *
+   * ```sql
+   * select *
+   * from logger_prefs_by_client_id;
+   * 
+   * CLIENT_ID           LOGGER_LEVEL  INCLUDE_CALL_STACK CREATED_DATE         EXPIRY_DATE
+   * ------------------- ------------- ------------------ -------------------- --------------------
+   * logger_demo_session ERROR         TRUE               24-APR-2013 02:48:13 24-APR-2013 14:48:13
+   * ```
+   * 
+   * @example
+   *
+   * -- Set system level logging level:
+   * exec logger.set_level(logger.g_debug_name);
+   * 
+   * -- Client Specific Configuration:
+   * -- In Oracle Session-1
+   * exec logger.set_level(logger.g_debug_name);
+   * 
+   * exec logger.log('Session-1: this should show up');
+   * 
+   * select id, logger_level, text, client_identifier, call_stack
+   * from logger_logs_5_min
+   * order by id;
+   * 
+   *   ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
+   * ---- ------------ ----------------------------------- ----------------- ----------------------------
+   *   31         16 Session-1: this should show up              object      line  object
+   * 
+   * exec logger.set_level (logger.g_error_name);
+   * 
+   * exec logger.log('Session-1: this should NOT show up');
+   * 
+   * -- The previous line does not get logged since the logger level is set to ERROR and it made a .log call
+   * 
+   * 
+   * -- In Oracle Session-2 (i.e. a different session)
+   * exec dbms_session.set_identifier('my_identifier');
+   * 
+   * -- This sets the logger level for current identifier
+   * exec logger.set_level(logger.g_debug_name, sys_context('userenv','client_identifier'));
+   * 
+   * exec logger.log('Session-2: this should show up');
+   * 
+   * select id, logger_level, text, client_identifier, call_stack
+   * from logger_logs_5_min
+   * order by id;
+   * 
+   *   ID LOGGER_LEVEL TEXT                      CLIENT_IDENTIFIER CALL_STACK
+   * ---- ------------ ----------------------------------- ----------------- ----------------------------
+   *   31         16 Session-1: this should show up                  object      line  object
+   *   32         16 Session-2: this should show up    my_identifier   object      line  object
+   * 
+   * -- Notice how the CLIENT_IDENTIFIER field also contains the current client_identifer
+   * -- In APEX the client_identifier is
+   * :APP_USER || ':' || :APP_SESSION
+   *
+   *  @issue #60 Allow security check to be bypassed for client specific logging level
+   *  @issue #48 Allow of numbers to be passed in p_level. Did not overload (see ticket comments as to why)
+   *  @issue #110 Clear context values when level changes globally
+   *  @issue #29 If p_level is deprecated, set to DEBUG
+   *
+   * @author Tyler Muth
+   * @created ???
+   *
+   * @param p_level Use `logger.g_<level>_name` constants. If the level is deprecated it will automatically be set to `debug`.
+   * @param p_client_id Optional: If defined, will set the level for the given client identifier. If `null` will set global settings.
+   *  In APEX the `client_identifier` is `:APP_USER || ':' || :APP_SESSION`
+   * @param p_include_call_stack Optional: Only valid if `p_client_id` is defined. Valid values: `TRUE`, `FALSE`. If not set will use the default system pref in `logger_prefs`.
+   * @param p_client_id_expire_hours Optiona: If `p_client_id` is defined , expire after number of hours. If not defined, will default to system preference `PREF_BY_CLIENT_ID_EXPIRE_HOURS`
    */
-  function sprintf(
-    p_str in varchar2,
-    p_s1 in varchar2 default null,
-    p_s2 in varchar2 default null,
-    p_s3 in varchar2 default null,
-    p_s4 in varchar2 default null,
-    p_s5 in varchar2 default null,
-    p_s6 in varchar2 default null,
-    p_s7 in varchar2 default null,
-    p_s8 in varchar2 default null,
-    p_s9 in varchar2 default null,
-    p_s10 in varchar2 default null)
-    return varchar2
-  as
-    l_return varchar2(4000);
-    c_substring_regexp constant varchar2(10) := '%s';
+  procedure set_level(
+    p_level in varchar2 default logger.g_debug_name,
+    p_client_id in varchar2 default null,
+    p_include_call_stack in varchar2 default null,
+    p_client_id_expire_hours in number default null
+  )
+  is
+    l_level varchar2(20);
+    l_ctx varchar2(2000);
+    l_include_call_stack varchar2(255);
+    l_client_id_expire_hours number;
+    l_expiry_date logger_prefs_by_client_id.expiry_date%type;
 
+    l_id logger_logs.id%type;
+    pragma autonomous_transaction;
   begin
-    l_return := p_str;
+  -- TODO mdsouza: check the produced documentation for this  as `:APP_USER || ':' || :APP_SESSION` seems to be lost in Github
+    $if $$no_op $then
+      raise_application_error (-20000,
+          'Either the NO-OP version of Logger is installed or it is compiled for NO-OP,  so you cannot set the level.');
+    $else
+      l_level := replace(upper(p_level),' ');
 
-    -- Replace %s<n> with p_s<n>``
-    for i in 1..10 loop
-      l_return := regexp_replace(l_return, c_substring_regexp || i,
-        case
-          when i = 1 then p_s1
-          when i = 2 then p_s2
-          when i = 3 then p_s3
-          when i = 4 then p_s4
-          when i = 5 then p_s5
-          when i = 6 then p_s6
-          when i = 7 then p_s7
-          when i = 8 then p_s8
-          when i = 9 then p_s9
-          when i = 10 then p_s10
-          else null
-        end,
-        1,0,'c');
-    end loop;
+      if is_number(p_str => l_level) then
+        l_level := convert_level_num_to_char(p_level => p_level);
+      end if;
 
-    $if $$logger_debug $then
-      dbms_output.put_line('Before sys.utl_lms: ' || l_return);
+      l_include_call_stack := nvl(trim(upper(p_include_call_stack)), get_pref(logger.gc_pref_include_call_stack));
+
+      assert(
+        is_valid_level(p_level => l_level),
+        '"LEVEL" must be one of the following values: ' || get_all_level_names(p_delimiter => ', ')
+        );
+      assert(l_include_call_stack in ('TRUE', 'FALSE'), 'l_include_call_stack must be TRUE or FALSE');
+
+      -- #60 Allow security check to be bypassed for client specific logging level
+      if p_client_id is not null or admin_security_check then
+        l_ctx := 'Host: '||sys_context('USERENV','HOST');
+        l_ctx := l_ctx || ', IP: '||sys_context('USERENV','IP_ADDRESS');
+        l_ctx := l_ctx || ', TERMINAL: '||sys_context('USERENV','TERMINAL');
+        l_ctx := l_ctx || ', OS_USER: '||sys_context('USERENV','OS_USER');
+        l_ctx := l_ctx || ', CURRENT_USER: '||sys_context('USERENV','CURRENT_USER');
+        l_ctx := l_ctx || ', SESSION_USER: '||sys_context('USERENV','SESSION_USER');
+
+        -- #29 Deprecate old levels. Log and set to DEBUG
+        if l_level in (logger.g_apex_name, logger.g_sys_context_name, logger.g_timing_name)  then
+          logger.ins_logger_logs(
+            p_logger_level => logger.g_warning,
+            p_text =>
+              logger.sprintf('Logger level: %s1 is deprecated. Set for client_id %s2. Automatically setting to %s3', l_level, nvl(p_client_id, '<global>'), logger.g_debug_name),
+            po_id => l_id);
+
+          l_level := logger.g_debug_name;
+        end if;
+
+
+        -- Separate updates/inserts for client_id or global settings
+        if p_client_id is not null then
+          l_client_id_expire_hours := nvl(p_client_id_expire_hours, get_pref(logger.gc_pref_client_id_expire_hours));
+          l_expiry_date := sysdate + l_client_id_expire_hours/24;
+
+          merge into logger_prefs_by_client_id ci
+          using (select p_client_id client_id from dual) s
+            on (ci.client_id = s.client_id)
+          when matched then update
+            set logger_level = l_level,
+              include_call_stack = l_include_call_stack,
+              expiry_date = l_expiry_date,
+              created_date = sysdate
+          when not matched then
+            insert(ci.client_id, ci.logger_level, ci.include_call_stack, ci.created_date, ci.expiry_date)
+            values(p_client_id, l_level, l_include_call_stack, sysdate, l_expiry_date)
+          ;
+
+        else
+          -- Global settings
+          logger.g_can_update_logger_prefs := true;
+          update logger_prefs
+          set pref_value = l_level
+          where 1=1
+            and pref_type = logger.g_pref_type_logger
+            and pref_name = logger.gc_pref_level;
+          logger.g_can_update_logger_prefs := false;
+        end if;
+
+        -- #110 Need to reset all contexts so that level is reset for sessions where client_identifier is defined
+        -- This is required for global changes since sessions with client_identifier set won't be properly updated.
+        if p_client_id is null then
+          logger.null_global_contexts;
+        end if;
+
+        logger.save_global_context(
+          p_attribute => gc_ctx_attr_level,
+          p_value => logger.convert_level_char_to_num(l_level),
+          p_client_id => p_client_id); -- Note: if p_client_id is null then it will set for global`
+
+        -- Manual insert to ensure that data gets logged, regardless of logger_level
+        logger.ins_logger_logs(
+          p_logger_level => logger.g_information,
+          p_text => 'Log level set to ' || l_level || ' for client_id: ' || nvl(p_client_id, '<global>') || ', include_call_stack=' || l_include_call_stack || ' by ' || l_ctx,
+          po_id => l_id);
+
+      end if; -- p_client_id is not null or admin_security_check
     $end
 
-    -- Replace any occurences of %s with p_s<n> (in order) and escape %% to %
-    l_return := sys.utl_lms.format_message(l_return,p_s1, p_s2, p_s3, p_s4, p_s5, p_s6, p_s7, p_s8, p_s9, p_s10);
-
-    return l_return;
-
-  end sprintf;
+    commit;
+  end set_level;
 
 
   /**
-   * Returns the rec_logger_logs for given logger_level
-   * Used for plugin.
-   * Not meant to be called by general public, and thus not documented
+   * Unsets a logger level for a given `p_client_id`
+   * This will only unset for client specific logger levels
    *
-   * Notes:
-   *  - -- FUTURE mdsouza: Add tests for this (#86)
+   * @example
    *
-   * Related Tickets:
-   *  - #46
+   * exec logger.unset_client_level('my_client_id');
    *
    * @author Martin D'Souza
-   * @created 11-Mar-2015
-   * @param p_logger_level Logger level of plugin wanted to return
-   * @return Logger rec based on plugin type
+   * @created 6-Apr-2013
+   * @param p_client_id Client identifier (case sensitive) to unset logging level
    */
-  function get_plugin_rec(
-    p_logger_level in logger_logs.logger_level%type)
-    return logger.rec_logger_log
+  procedure unset_client_level(p_client_id in varchar2)
+  as
+    pragma autonomous_transaction;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      assert(p_client_id is not null, 'p_client_id is a required value');
+
+      -- Remove from client specific table
+      delete from logger_prefs_by_client_id
+      where client_id = p_client_id;
+
+      -- Remove context values
+      dbms_session.clear_context(
+       namespace => g_context_name,
+       client_id => p_client_id,
+       attribute => gc_ctx_attr_level);
+
+      dbms_session.clear_context(
+       namespace => g_context_name,
+       client_id => p_client_id,
+       attribute => gc_ctx_attr_include_call_stack);
+
+    $end
+
+    commit;
+  end unset_client_level;
+
+
+  /**
+   * Unsets client_level that are stale (i.e. past thier expiry date)
+   *
+   * Note: this run automatically each hour by the `logger_unset_prefs_by_client` job
+   * 
+   * @example
+   *
+   * exec logger.unset_client_level;
+   *
+   * @author Martin D'Souza
+   * @created 7-Apr-2013
+   * @param p_unset_after_hours If null then preference UNSET_CLIENT_ID_LEVEL_AFTER_HOURS
+   */
+  procedure unset_client_level
   as
   begin
+    $if $$no_op $then
+      null;
+    $else
+      for x in (
+        select client_id
+        from logger_prefs_by_client_id
+        where sysdate > expiry_date) loop
 
-    if p_logger_level = logger.g_error then
-      return g_plug_logger_log_error;
-    end if;
-  end get_plugin_rec;
+        unset_client_level(p_client_id => x.client_id);
+      end loop;
+    $end
+  end unset_client_level;
 
+
+  /**
+   * Unsets all client specific preferences (regardless of expiry time)
+   * Note: An implicit commit (`pragma autonomous_transaction`) will occur as `unset_client_level` makes a commit
+   *
+   * 
+   * @example
+   *
+   * exec logger.unset_client_level_all;
+   *
+   * @author Martin D'Souza
+   * @created 7-Apr-2013
+   */
+  procedure unset_client_level_all
+  as
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      for x in (select client_id from logger_prefs_by_client_id) loop
+        unset_client_level(p_client_id => x.client_id);
+      end loop;
+    $end
+  end unset_client_level_all;
+
+
+  /**
+   * Since all the timing procedures are tightly coupled, the following example will be used to cover all of them:
+   *
+   * @example
+   *
+   * declare
+   *     l_number number;
+   * begin
+   *     logger.time_reset;
+   *     logger.time_start('foo');
+   *     logger.time_start('bar');
+   *     for i in 1..500000 loop
+   *         l_number := power(i,15);
+   *         l_number := sqrt(1333);
+   *     end loop; --i
+   *     logger.time_stop('bar');
+   *     for i in 1..500000 loop
+   *         l_number := power(i,15);
+   *         l_number := sqrt(1333);
+   *     end loop; --i
+   *     logger.time_stop('foo');
+   * end;
+   * /
+   * 
+   * select text from logger_logs_5_min;
+   * 
+   * TEXT
+   * ---------------------------------
+   * START: foo
+   * >  START: bar
+   * >  STOP : bar - 1.000843 seconds
+   * STOP : foo - 2.015953 seconds
+   *
+   * @issue #73
+   * @issue #75: Use localtimestamp
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_unit Unique "code" to identify timer. Allows for nesting (see example)
+   * @param p_log_in_table If true will log timer in `logger_logs`
+   */
+  procedure time_start(
+    p_unit in varchar2,
+    p_log_in_table in boolean default true)
+  is
+    l_proc_name varchar2(100);
+    l_text varchar2(4000);
+    l_pad varchar2(100);
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        g_running_timers := g_running_timers + 1;
+
+        if g_running_timers > 1 then
+          -- Use 'a' since lpad requires a value to pad
+          l_pad := replace(lpad('a',logger.g_running_timers,'>')||' ', 'a', null);
+        end if;
+
+        g_proc_start_times(p_unit) := localtimestamp;
+
+        l_text := l_pad||'START: '||p_unit;
+
+        if p_log_in_table then
+          ins_logger_logs(
+            p_unit_name => p_unit ,
+            p_logger_level => g_timing,
+            p_text =>l_text,
+            po_id => g_log_id);
+        end if;
+      end if;
+    $end
+  end time_start;
+
+  /**
+   * Stops a timing event and logs in `logger_logs` using `level = logger.g_timing`.
+   *
+   * See [`time_start`](#time_start) for example
+   *
+   * @issuse #73: Remove additional timer decrement since it was already happening in function time_stop
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_unit Timer to stop
+   * @param p_scope `scope` to store in `logger_logs`
+   */
+  procedure time_stop(
+    p_unit in varchar2,
+    p_scope in varchar2 default null)
+  is
+    l_time_string varchar2(50);
+    l_text varchar2(4000);
+    l_pad varchar2(100);
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        if g_proc_start_times.exists(p_unit) then
+
+          if g_running_timers > 1 then
+            -- Use 'a' since lpad requires a value to pad
+            l_pad := replace(lpad('a',logger.g_running_timers,'>')||' ', 'a', null);
+          end if;
+
+          --l_time_string := rtrim(regexp_replace(systimestamp-(g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
+          -- Function time_stop will decrement the timers and pop the name from the g_proc_start_times array
+          l_time_string := time_stop(
+            p_unit => p_unit,
+            p_log_in_table => false);
+
+          l_text := l_pad||'STOP : '||p_unit ||' - '||l_time_string;
+
+          ins_logger_logs(
+            p_unit_name => p_unit,
+            p_scope => p_scope ,
+            p_logger_level => g_timing,
+            p_text =>l_text,
+            po_id => g_log_id);
+        end if;
+      end if;
+    $end
+  end time_stop;
+
+
+  /**
+   * Similar to [`time_stop`](#time_stop) (above). This function will stop a timer. 
+   * Logging into `logger_logs` is configurable via `p_log_in_table`. 
+   * Returns the stop time string.
+   *
+   * See `time_start` for example
+   *
+   * @issue #73
+   * @issue #75: Trim timezone from systimestamp to localtimestamp
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_unit Timer to stop.
+   * @param p_scope `scope` to log timer under.
+   * @param p_log_in_table Store result in `logger_logs`
+   * @return Timer results
+   */
+  function time_stop(
+    p_unit in varchar2,
+    p_scope in varchar2 default null,
+    p_log_in_table IN boolean default true)
+    return varchar2
+  is
+    l_time_string varchar2(50);
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        if g_proc_start_times.exists(p_unit) then
+
+          l_time_string := rtrim(regexp_replace(localtimestamp - (g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
+
+          g_proc_start_times.delete(p_unit);
+          g_running_timers := g_running_timers - 1;
+
+          if p_log_in_table then
+            ins_logger_logs(
+              p_unit_name => p_unit,
+              p_scope => p_scope ,
+              p_logger_level => g_timing,
+              p_text => l_time_string,
+              po_id => g_log_id);
+          end if;
+
+          return l_time_string;
+
+        end if;
+      end if;
+    $end
+  end time_stop;
+
+
+  /**
+   * See [`time_stop`](#time_stop).
+   * Only difference is that time is logged in seconds
+   *
+   * @issue #73:
+   * @issue #75: Trim timezone from systimestamp to localtimestamp
+   *
+   * @author Tyler Muth
+   * @created ???
+   * @param p_unit
+   * @param p_scope
+   * @param p_log_in_table
+   * @return Timer in seconds
+   */
+  function time_stop_seconds(
+    p_unit in varchar2,
+    p_scope in varchar2 default null,
+    p_log_in_table in boolean default true
+    )
+    return number
+  is
+    l_time_string varchar2(50);
+    l_seconds number;
+    l_interval interval day to second;
+
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        if g_proc_start_times.exists(p_unit) then
+          l_interval := localtimestamp - (g_proc_start_times(p_unit));
+          l_seconds := extract(day from l_interval) * 86400 + extract(hour from l_interval) * 3600 + extract(minute from l_interval) * 60 + extract(second from l_interval);
+
+          g_proc_start_times.delete(p_unit);
+          g_running_timers := g_running_timers - 1;
+
+          if p_log_in_table then
+            ins_logger_logs(
+              p_unit_name => p_unit,
+              p_scope => p_scope ,
+              p_logger_level => g_timing,
+              p_text => l_seconds,
+              po_id => g_log_id);
+          end if;
+
+          return l_seconds;
+
+        end if;
+      end if;
+    $end
+  end time_stop_seconds;
+
+
+  /**
+   * Resets all timers
+   * 
+   *
+   * See [`time_start`](#time_start) for example
+   *
+   * @author Tyler Muth
+   * @created ???
+   */
+  procedure time_reset
+  is
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      if ok_to_log(logger.g_debug) then
+        g_running_timers := 0;
+        g_proc_start_times.delete;
+      end if;
+    $end
+  end time_reset;
+
+
+
+  /**
+   * Converts the logger level num to char format
+   *
+   * @issue #48
+   *
+   * @author Martin D'Souza
+   * @created 14-Jun-2014
+   * @param p_level
+   * @return Logger level string format. `null` if `p_level` not found
+   */
+  function convert_level_num_to_char(
+    p_level in number)
+    return varchar2
+  is
+    l_return varchar2(255);
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      l_return :=
+        case p_level
+          when g_off then g_off_name
+          when g_permanent then g_permanent_name
+          when g_error then g_error_name
+          when g_warning then g_warning_name
+          when g_information then g_information_name
+          when g_debug then g_debug_name
+          when g_timing then g_timing_name
+          when g_sys_context then g_sys_context_name
+          when g_apex then g_apex_name
+          else null
+        end;
+    $end
+
+    return l_return;
+  end convert_level_num_to_char;
+
+
+  
 end logger;
 /
 
@@ -4134,20 +4732,38 @@ prompt logger_context
 
 declare
 	-- the following line is also used in a constant declaration in logger.pkb
-	l_ctx_name varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
+	-- l_ctx_name varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
+	l_sql varchar2(500);
+	l_count pls_integer;
 begin
-	execute immediate 'create or replace context '||l_ctx_name||' using logger accessed globally';
+	-- #82: determine if you can create any context first
+	select count(1)
+	into l_count
+	from session_privs sp
+	where 1=1
+		and sp.privilege = 'CREATE ANY CONTEXT';
+	
+	if l_count = 0 then
+		dbms_output.put_line('Do not have access to create context; skipping');
+	else
 
-	merge into logger_prefs p
-	using (select 'GLOBAL_CONTEXT_NAME' pref_name, l_ctx_name pref_value, logger.g_pref_type_logger pref_type from dual) d
-		on (1=1
-			and p.pref_type = d.pref_type
-			and p.pref_name = d.pref_name)
-	when matched then
-		update set p.pref_value = d.pref_value
-	when not matched then
-		insert (p.pref_name, p.pref_value, p.pref_type)
-		values (d.pref_name, d.pref_value, d.pref_type);
+		l_sql := 'create or replace context %s1 using logger accessed globally';
+		execute immediate logger.sprintf(l_sql, logger.g_context_name);
+
+		-- #184: hack to allow for setting GLOBAL_CONTEXT_NAME
+		logger.g_can_update_logger_prefs := true;
+		merge into logger_prefs p
+		using (select 'GLOBAL_CONTEXT_NAME' pref_name, logger.g_context_name pref_value, logger.g_pref_type_logger pref_type from dual) d
+			on (1=1
+				and p.pref_type = d.pref_type
+				and p.pref_name = d.pref_name)
+		when matched then
+			update set p.pref_value = d.pref_value
+		when not matched then
+			insert (p.pref_name, p.pref_value, p.pref_type)
+			values (d.pref_name, d.pref_value, d.pref_type);
+		logger.g_can_update_logger_prefs := false;
+	end if;
 end;
 /
 
@@ -4270,8 +4886,7 @@ begin
   if upper(l_pref_value) = 'TRUE' then
     l_logger_debug := true;
   end if;
-
-
+  
   -- #46
   -- Handle plugin settings
 -- Set for each plugin type
@@ -4289,6 +4904,15 @@ begin
     l_variables := l_variables || x.var;
   end loop;
 
+  -- #82: Determine if we have a context set
+  select decode(lp.pref_value, 'NONE', 'FALSE', 'TRUE')
+  into l_pref_value
+  from logger_prefs lp
+  where 1=1
+		and lp.pref_type = upper(l_pref_type_logger)
+    and lp.pref_name = 'GLOBAL_CONTEXT_NAME';
+  l_variables := l_variables || 'LOGGER_CONTEXT:' || l_pref_value||',';
+
 
   l_variables := rtrim(l_variables,',');
   if l_logger_debug then
@@ -4297,6 +4921,8 @@ begin
 
 
 	-- Recompile Logger
+  -- #82: Need to recompile spec and body
+ 	l_sql := q'!alter package logger compile PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
  	l_sql := q'!alter package logger compile body PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
 	l_sql := replace(l_sql, '%VARIABLES%', l_variables);
 	execute immediate l_sql;
