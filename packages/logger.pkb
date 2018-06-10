@@ -2667,12 +2667,13 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    */
   function ok_to_log(p_level in number)
     return boolean
-    $if 1=1
-      and ($$rac_lt_11_2 or not $$logger_context)
-      and not dbms_db_version.ver_le_10_2
-      and ($$no_op is null or not $$no_op) $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
-    $end
+    -- TODO mdsouza: having issue with overloading and result cache in pks
+    -- $if 1=1
+    --   and ($$rac_lt_11_2 or not $$logger_context)
+    --   and not dbms_db_version.ver_le_10_2
+    --   and ($$no_op is null or not $$no_op) $then
+    --     result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+    -- $end
   is
     l_level number;
     l_level_char varchar2(50);

@@ -1181,12 +1181,13 @@ as
 
   function ok_to_log(p_level in number)
     return boolean
-    $if 1=1
-      and ($$rac_lt_11_2 or not $$logger_context)
-      and not dbms_db_version.ver_le_10_2
-      and ($$no_op is null or not $$no_op) $then
-        result_cache
-    $end
+    -- TODO mdsouza: having issue with overloading and result cache in pks
+    -- $if 1=1
+    --   and ($$rac_lt_11_2 or not $$logger_context)
+    --   and not dbms_db_version.ver_le_10_2
+    --   and ($$no_op is null or not $$no_op) $then
+    --     result_cache
+    -- $end
     ;
 
   function ok_to_log(p_level in varchar2)
@@ -3920,12 +3921,13 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    */
   function ok_to_log(p_level in number)
     return boolean
-    $if 1=1
-      and ($$rac_lt_11_2 or not $$logger_context)
-      and not dbms_db_version.ver_le_10_2
-      and ($$no_op is null or not $$no_op) $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
-    $end
+    -- TODO mdsouza: having issue with overloading and result cache in pks
+    -- $if 1=1
+    --   and ($$rac_lt_11_2 or not $$logger_context)
+    --   and not dbms_db_version.ver_le_10_2
+    --   and ($$no_op is null or not $$no_op) $then
+    --     result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+    -- $end
   is
     l_level number;
     l_level_char varchar2(50);
@@ -4789,7 +4791,7 @@ is
   l_large_text_column varchar2(50);
 
   l_sql varchar2(32767);
-  l_variables varchar2(1000) := ' ';
+  l_variables varchar2(1000);
   l_dummy number;
   l_flashback varchar2(50) := 'FALSE';
   l_utl_lms varchar2(5) := 'FALSE';
@@ -4802,6 +4804,18 @@ is
   l_logger_debug boolean;
 
 	l_pref_type_logger logger_prefs.pref_type%type;
+
+  procedure add_variable(
+    p_name in varchar2,
+    p_value in varchar2
+  )
+  as
+  begin
+    if l_variables is not null then
+      l_variables := l_variables || ',';
+    end if;
+    l_variables := l_variables || p_name || ':' || p_value;
+  end add_variable;
 begin
 
   -- Check to see if we are in a RAC Database, 11.1 or lower.
@@ -4816,8 +4830,7 @@ begin
   if l_version >= 11.2 then
     l_rac_lt_11_2 := 'FALSE';
   end if;
-
-  l_variables := 'RAC_LT_11_2:'||l_rac_lt_11_2||',';
+  add_variable(p_name => 'RAC_LT_11_2', p_value => l_rac_lt_11_2);
 
 
   -- Check lenth of TEXT size (this is for future 12c 32767 integration
@@ -4834,7 +4847,7 @@ begin
   else
     l_large_text_column := 'FALSE';
   end if;
-  l_variables := l_variables||'LARGE_TEXT_COLUMN:'||l_large_text_column||',';
+  add_variable(p_name => 'LARGE_TEXT_COLUMN', p_value => l_large_text_column);
 
 
   -- Is APEX installed ?
@@ -4849,8 +4862,7 @@ begin
     when no_data_found then
       l_apex := 'TRUE';
   end;
-
-  l_variables := l_variables||'APEX:'||l_apex||',';
+  add_variable(p_name => 'APEX', p_value => l_apex);
 
 
   -- Can we call dbms_flashback to get the currect System Commit Number?
@@ -4862,12 +4874,9 @@ begin
   exception when pls_pkg_not_exist then
     l_flashback := 'FALSE';
   end;
-
-  l_variables := l_variables||'FLASHBACK_ENABLED:'||l_flashback||',';
-
+  add_variable(p_name => 'FLASHBACK_ENABLED', p_value => l_flashback);
 
   -- #64: Support to run Logger in debug mode
-
 	-- #127
 	-- Since this procedure will recompile Logger, if it directly references a variable in Logger
 	-- It will lock itself while trying to recompile
@@ -4880,28 +4889,30 @@ begin
   where 1=1
 		and lp.pref_type = upper(l_pref_type_logger)
     and lp.pref_name = 'LOGGER_DEBUG';
-  l_variables := l_variables || 'LOGGER_DEBUG:' || l_pref_value||',';
+  add_variable(p_name => 'LOGGER_DEBUG', p_value => l_pref_value);
 
   l_logger_debug := false;
   if upper(l_pref_value) = 'TRUE' then
     l_logger_debug := true;
   end if;
+
+  -- TODO mdsouza: delete
+  l_logger_debug := true;
   
   -- #46
   -- Handle plugin settings
--- Set for each plugin type
+  -- Set for each plugin type
   for x in (
     select
       'LOGGER_' ||
-      regexp_replace(lp.pref_name, '^PLUGIN_FN_', 'PLUGIN_') || ':' ||
-      decode(nvl(upper(lp.pref_value), 'NONE'), 'NONE', 'FALSE', 'TRUE') ||
-      ',' var
+        regexp_replace(lp.pref_name, '^PLUGIN_FN_', 'PLUGIN_') name,
+      decode(nvl(upper(lp.pref_value), 'NONE'), 'NONE', 'FALSE', 'TRUE') value
     from logger_prefs lp
     where 1=1
 			and lp.pref_type = l_pref_type_logger
       and lp.pref_name like 'PLUGIN_FN%'
   ) loop
-    l_variables := l_variables || x.var;
+    add_variable(p_name => x.name, p_value => x.value);
   end loop;
 
   -- #82: Determine if we have a context set
@@ -4911,10 +4922,9 @@ begin
   where 1=1
 		and lp.pref_type = upper(l_pref_type_logger)
     and lp.pref_name = 'GLOBAL_CONTEXT_NAME';
-  l_variables := l_variables || 'LOGGER_CONTEXT:' || l_pref_value||',';
+  add_variable(p_name => 'LOGGER_CONTEXT', p_value => l_pref_value);
 
 
-  l_variables := rtrim(l_variables,',');
   if l_logger_debug then
     dbms_output.put_line('l_variables: ' || l_variables);
   end if;
@@ -4922,7 +4932,10 @@ begin
 
 	-- Recompile Logger
   -- #82: Need to recompile spec and body
+  -- TODO mdsouza: was using reuse settings
+  dbms_output.put_line('before pks');
  	l_sql := q'!alter package logger compile PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
+  dbms_output.put_line('before pkb');
  	l_sql := q'!alter package logger compile body PLSQL_CCFLAGS='%VARIABLES%' reuse settings!';
 	l_sql := replace(l_sql, '%VARIABLES%', l_variables);
 	execute immediate l_sql;
