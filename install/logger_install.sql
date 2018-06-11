@@ -3238,9 +3238,9 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
         elsif 1=1
           and l_pref_name = gc_pref_plugin_fn_error 
           -- Ensure valid packge.function name
-          and (1=2
-            or p_pref_value != 'NONE'
-            or not regexp_like(p_pref_value, '^(([[:digit:]]|[[:lower:]]|_)+\.)?([[:digit:]]|[[:lower:]]|_)+$', 'i')
+          and not (1=2
+            or p_pref_value = 'NONE'
+            or regexp_like(p_pref_value, '^(([[:digit:]]|[[:lower:]]|_)+\.)?([[:digit:]]|[[:lower:]]|_)+$', 'i')
            ) then
           l_err_msg := 'invalid method name. Should be package.function name or use NONE';
         end if;
@@ -3655,6 +3655,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    * @return String with character codes.
    */
   function get_character_codes(
+    -- TODO mdsouza: why is this p_string but proc is p_text?
     p_string in varchar2,
     p_show_common_codes in boolean default true)
     return varchar2
