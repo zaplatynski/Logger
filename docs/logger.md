@@ -1209,9 +1209,7 @@ Name | Description
 ### Syntax
 ```plsql
 function get_character_codes(
-  p_string in varchar2,
-  p_show_common_codes in boolean default true)
-  return varchar2
+  -- TODO mdsouza: why
 ```
 
 ### Parameters
@@ -1475,10 +1473,11 @@ Name | Description
 ```plsql
 function ok_to_log(p_level in number)
   return boolean
-  $if 1=1
-    and ($$rac_lt_11_2 or not $$logger_context)
-    and not dbms_db_version.ver_le_10_2
-    and ($$no_op
+  -- TODO mdsouza: having issue with overloading and result cache in pks
+  -- $if 1=1
+  --   and ($$rac_lt_11_2 or not $$logger_context)
+  --   and not dbms_db_version.ver_le_10_2
+  --   and ($$no_op
 ```
 
 ### Parameters
