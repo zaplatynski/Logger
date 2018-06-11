@@ -27,7 +27,7 @@ console.log(`Building logger ${params.version.string}`);
 // });
 
 
-fn.fs.writeFile(config.files.install, '');
+fn.fs.writeFile(config.files.install, ``);
 fn.fs.writeFile(config.files.installNoop, '');
 
 fn.fs.appendFile(config.files.installNoop, `
