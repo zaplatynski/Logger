@@ -35,7 +35,10 @@ begin
       when no_data_found then
         -- #82
         if l_priv = 'CREATE ANY CONTEXT' then
-          dbms_output.put_line('*** Warning: the current schema does not have CREATE ANY CONTEXT privlege. Logger will still work but is recommended to have this');
+          dbms_output.put_line('');
+          dbms_output.put_line('*** Warning: the current schema does not have CREATE ANY CONTEXT privlege.');
+          dbms_output.put_line('*** Logger will still work but is recommended to have this.');
+          dbms_output.put_line('');
         else
           dbms_output.put_line('Error, the current schema is missing the following privilege: '||l_priv);
           l_priv_error := true;
