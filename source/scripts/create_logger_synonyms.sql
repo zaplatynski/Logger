@@ -15,3 +15,5 @@ create or replace synonym logger_prefs_by_client_id for &from_user..logger_prefs
 create or replace synonym logger_logs_5_min for &from_user..logger_logs_5_min;
 create or replace synonym logger_logs_60_min for &from_user..logger_logs_60_min;
 create or replace synonym logger_logs_terse for &from_user..logger_logs_terse;
+-- PBA/MNU 3.1.2
+create or replace synonym logger_prefs_by_scope for &from_user..logger_prefs_by_scope;

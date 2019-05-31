@@ -58,6 +58,7 @@ as
 
   gc_ctx_attr_level constant varchar2(5) := 'level';
   gc_ctx_attr_include_call_stack constant varchar2(18) := 'include_call_stack';
+  gc_ctx_attr_scope constant varchar2(5) := 'scope';
 
   -- #46 Plugin context names
   gc_ctx_plugin_fn_log constant varchar2(30) := 'plugin_fn_log';
@@ -440,14 +441,14 @@ as
    *
    * @author Tyler Muth
    * @created ???
-   * @param
+   * @param p_scope
    * @return If client level specified will return it, otherwise global level.
    */
-  function get_level_number
+  function get_level_number(p_scope in varchar2 default null) -- PBA/MNU 201704
     return number
     $if $$rac_lt_11_2 $then
       $if not dbms_db_version.ver_le_10_2 $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+        result_cache relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
       $end
     $end
   is
@@ -466,7 +467,8 @@ as
         dbms_output.put_line(l_scope || ': selecting logger_level');
       $end
 
-      l_level := convert_level_char_to_num(logger.get_pref(logger.gc_pref_level));
+      l_level := convert_level_char_to_num(logger.get_pref(p_pref_name => logger.gc_pref_level
+                                                          ,p_scope => p_scope)); -- PBA/MNU 201704
 
       return l_level;
     $end
@@ -929,15 +931,17 @@ as
    * @created ???
    *
    * @param p_level Level (number)
+   * @param p_scope 
    * @return True of statement can be logged to LOGGER_LOGS
    */
-  function ok_to_log(p_level in number)
+  function ok_to_log(p_level in number,
+    p_scope in varchar2 default null)
     return boolean
     $if 1=1
       and $$rac_lt_11_2
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+        result_cache relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
     $end
   is
     l_level number;
@@ -960,21 +964,31 @@ as
         $if $$logger_debug $then
           dbms_output.put_line(l_scope || ': calling get_level_number');
         $end
-        l_level := get_level_number;
+        l_level := get_level_number(p_scope => p_scope); -- PBA/MNU 201704
       $else
-        l_level := sys_context(g_context_name,gc_ctx_attr_level);
+          l_level := sys_context(g_context_name,gc_ctx_attr_level);
+        
+        -- PBA/MNU 201704
+        -- if the current scope is different from the saved scope (context) then clear the level
+        -- (only applies to non-empty scopes)
+        if coalesce(sys_context(g_context_name,gc_ctx_attr_scope),'#^') <> coalesce(p_scope,'#^') then
+          l_level := null;
+        end if;
 
         if l_level is null then
           $if $$logger_debug $then
             dbms_output.put_line(l_scope || ': level was null, getting and setting in context');
           $end
 
-          l_level := get_level_number;
+          l_level := get_level_number(p_scope => p_scope); -- PBA/MNU 201704
 
           save_global_context(
             p_attribute => gc_ctx_attr_level,
             p_value => l_level,
             p_client_id => sys_context('userenv','client_identifier'));
+          save_global_context(
+            p_attribute => gc_ctx_attr_scope,
+            p_value => p_scope);
         end if;
       $end
 
@@ -994,16 +1008,19 @@ as
    * @created 25-Jul-2013
    *
    * @param p_level Level (DEBUG etc..)
+   * @param p_scope 
    * @return True of log statements for that level or below will be logged
    */
-  function ok_to_log(p_level in varchar2)
+  function ok_to_log(p_level in varchar2,
+    p_scope in varchar2 default null)
     return boolean
   as
   begin
     $if $$no_op $then
       return false;
     $else
-      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level));
+      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level)
+                      ,p_scope => p_scope);
     $end
   end ok_to_log;
 
@@ -1182,7 +1199,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_error) then
+--      if ok_to_log(logger.g_error) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_error, p_scope) then
         get_debug_info(
           p_callstack => dbms_utility.format_call_stack,
           o_unit => l_proc_name,
@@ -1254,7 +1272,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_permanent) then
+--      if ok_to_log(logger.g_permanent) then  -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_permanent, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_permanent,
@@ -1294,7 +1313,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_warning) then
+--      if ok_to_log(logger.g_warning) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_warning, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_warning,
@@ -1364,7 +1384,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_information) then
+--      if ok_to_log(logger.g_information) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_information, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_information,
@@ -1436,7 +1457,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_debug,
@@ -1525,7 +1547,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_extra := get_sys_context(
           p_detail_level => p_detail_level,
           p_vertical => true,
@@ -1566,7 +1589,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_extra := get_cgi_env(p_show_null    => p_show_null);
         log_internal(
           p_text => 'CGI ENV values stored in the EXTRA column',
@@ -1606,7 +1630,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_dump := get_character_codes(p_text,p_show_common_codes);
 
         log_internal(
@@ -1651,7 +1676,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
 
         $if $$apex $then
           -- Validate p_item_type
@@ -1755,7 +1781,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
 
           if g_running_timers > 1 then
@@ -1810,7 +1837,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
 
           l_time_string := rtrim(regexp_replace(localtimestamp - (g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
@@ -1866,7 +1894,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
           l_interval := localtimestamp - (g_proc_start_times(p_unit));
           l_seconds := extract(day from l_interval) * 86400 + extract(hour from l_interval) * 3600 + extract(minute from l_interval) * 60 + extract(second from l_interval);
@@ -1936,12 +1965,14 @@ as
    */
   function get_pref(
     p_pref_name in logger_prefs.pref_name%type,
-    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger)
+    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger,
+    p_scope in varchar2 default null -- PBA/MNU 201704
+    )
     return varchar2
     $if not dbms_db_version.ver_le_10_2  $then
       result_cache
       $if $$no_op is null or not $$no_op $then
-        relies_on (logger_prefs, logger_prefs_by_client_id)
+        relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
       $end
     $end
   is
@@ -1950,6 +1981,10 @@ as
     l_client_id logger_prefs_by_client_id.client_id%type;
     l_pref_name logger_prefs.pref_name%type := upper(p_pref_name);
     l_pref_type logger_prefs.pref_type%type := upper(p_pref_type);
+     -- PBA/MNU 201704
+     -- p_scope is entered as lowercase in the table so make the parameter lowercase here
+     -- l_scope is already used, so we use lp_scope
+    lp_scope logger_prefs_by_scope.logger_scope%type := lower(p_scope);
   begin
 
     $if $$no_op $then
@@ -1966,6 +2001,18 @@ as
       from (
         select pref_value, row_number () over (order by rank) rn
         from (
+          -- Scope specific logger levels trump client specific AND system level loggel level
+          select pref_value
+               , 0 rank
+            from (select logger_level pref_value
+                    from logger_prefs_by_scope
+                   where 1 = 1
+                     and l_pref_name = logger.gc_pref_level
+                     and lp_scope like logger_scope
+                   order by length(logger_scope) desc)
+           where 1 = 1
+             and rownum <= 1
+          union all
           -- Client specific logger levels trump system level logger level
           select
             case
@@ -2952,5 +2999,24 @@ as
     end if;
   end get_plugin_rec;
 
+ /**
+   * Unsets scope_level that are stale (i.e. past their expiry date)
+   *
+   * @author Patrick Barel/Milco Numan
+   * @created 18-Apr-2017
+   */
+  procedure unset_scope_level
+  as
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      delete
+        from logger_prefs_by_scope
+       where sysdate > expiry_date
+      ;
+      commit;
+    $end
+  end unset_scope_level;
 end logger;
 /

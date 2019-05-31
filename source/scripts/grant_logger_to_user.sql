@@ -15,3 +15,6 @@ grant select on logger_prefs_by_client_id to &to_user;
 grant select on logger_logs_5_min to &to_user;
 grant select on logger_logs_60_min to &to_user;
 grant select on logger_logs_terse to &to_user;
+-- PBA/MNU 3.1.2
+grant select, insert, update, delete on logger_prefs_by_scope to &to_user;
+
