@@ -25,7 +25,7 @@
     {
       "label": "oos-logger: build",
       "type": "shell",
-      "command": "scripts/build.sh",
+      "command": "scripts/bash/build.sh",
       // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
       // second argument is the file to execute (ie the current file)
       "args": [
