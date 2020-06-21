@@ -7,10 +7,10 @@
 if [ -z "${BASH_SOURCE[0]}" ] ; then 
   SCRIPT_DIR="$( cd "$( dirname "$0" )" >/dev/null 2>&1 && pwd )"
 else 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+  SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 fi
 # Root folder in project directory
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_DIR="$(dirname $(dirname "$SCRIPT_DIR"))"
 # echo "SCRIPT_DIR: $SCRIPT_DIR"
 # echo "PROJECT_DIR: $PROJECT_DIR"
 
@@ -30,10 +30,10 @@ load_colors(){
   FONT_RESET='\033[22m'
 } # load_colors
 
-# Load the config file stored in scripts/config
+# Load the config file stored in scripts/bash/config
 load_config(){
-  USER_CONFIG_FILE=$PROJECT_DIR/scripts/user-config.sh
-  PROJECT_CONFIG_FILE=$PROJECT_DIR/scripts/project-config.sh
+  USER_CONFIG_FILE=$PROJECT_DIR/scripts/bash/user-config.sh
+  PROJECT_CONFIG_FILE=$PROJECT_DIR/scripts/bash/project-config.sh
   # echo "USER_CONFIG_FILE: $USER_CONFIG_FILE"
   # echo "PROJECT_CONFIG_FILE: $PROJECT_CONFIG_FILE"
 

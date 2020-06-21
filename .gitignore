@@ -10,4 +10,4 @@ temp/*
 #For IMDone Atom.io plugin
 .imdone/*
 # Connection string to dev DB
-scripts/user-config.sh
+scripts/bash/user-config.sh
