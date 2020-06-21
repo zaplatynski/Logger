@@ -23,6 +23,23 @@
       "problemMatcher": []
     },
     {
+      "label": "oos-logger: build-3.2.0",
+      "type": "shell",
+      "command": "scripts/build.sh",
+      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
+      // second argument is the file to execute (ie the current file)
+      "args": [
+        "3.2.0"
+      ],
+      "group": "build",
+      // do not switch to the output pane automatically
+      "presentation": {
+        "reveal": "always", // always, never, silent
+        "panel": "dedicated" // shared, dedicated, new
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "oos-logger: install",
       "type": "shell",
       "command": ".vscode/scripts/run_sql.sh",
