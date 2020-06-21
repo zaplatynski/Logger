@@ -23,13 +23,13 @@
       "problemMatcher": []
     },
     {
-      "label": "oos-logger: build-3.2.0",
+      "label": "oos-logger: build",
       "type": "shell",
       "command": "scripts/build.sh",
       // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
       // second argument is the file to execute (ie the current file)
       "args": [
-        "3.2.0"
+        "${input:versionNum}"
       ],
       "group": "build",
       // do not switch to the output pane automatically
@@ -95,6 +95,21 @@
       },
       "options": {},
       "problemMatcher": []
+    }
+  ],
+  // See https://code.visualstudio.com/docs/editor/variables-reference#_input-variables for more on input variables
+  "inputs": [
+    {
+      "type": "pickString",
+      "id": "versionNum",
+      "description": "Build Version Num",
+      "options": [
+        // Update these with list of build versions
+        // Can drop older versions as they're released
+        "3.2.0",
+        "3.3.0"
+      ],
+      "default": "0.0.0"
     }
   ]
 }
