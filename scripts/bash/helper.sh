@@ -96,10 +96,10 @@ EOL
 # Verifies configuration
 verify_config(){
   # APEX_APP_IDS should be blank or list of IDs and not what is provided by default
-  if [ $APEX_APP_IDS = "CHANGEME" ]; then
-    echo -e "${COLOR_RED}APEX_APP_IDS is not configured.${COLOR_RESET} Modify $PROJECT_CONFIG_FILE"
-    exit
-  fi
+  # if [ $APEX_APP_IDS = "CHANGEME" ]; then
+  #   echo -e "${COLOR_RED}APEX_APP_IDS is not configured.${COLOR_RESET} Modify $PROJECT_CONFIG_FILE"
+  #   exit
+  # fi
 
   # Check that DB connection string is defined
   if [[ $DB_CONN == *"CHANGME_USERNAME"* ]]; then
