@@ -11,3 +11,6 @@ temp/*
 .imdone/*
 # Connection string to dev DB
 scripts/bash/user-config.sh
+
+# Temporary (while confirming all changes for #238)
+.vscode-old
