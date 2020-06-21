@@ -6,162 +6,77 @@
     {
       "label": "oos-logger: compile file",
       "type": "shell",
-      // Run sqlplus via a batch file
-      "windows": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      "osx": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      "linux": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
-      // second argument is the file to execute (ie the current file)
+      "command": ".vscode/scripts/run_sql.sh",
       "args": [
-        "ignore", //Leave blank
-        "@\"${file}\"",
-        "${fileBasename}"
+        // "${relativeFile}",
+        // "${file}"
+        // Escaped double quotes are required to make compatible with Cmder in Windows
+        "\"${relativeFile}\"",
+        "\"${file}\""
       ],
       "group": "build",
-      // do not switch to the output pane automatically
       "presentation": {
-        "reveal": "always", // always, never, silent
-        "panel": "dedicated" // shared, dedicated, new
+        "reveal": "always",
+        "panel": "dedicated"
       },
-      // use this to get any database errors (from user_errors view) listed in the "Problems" pane in VS Code
-      "problemMatcher": {
-        "owner": "plsql",
-        "fileLocation": [
-          "relative",
-          "${fileDirname}"
-        ],
-        "pattern": [
-          {
-            "regexp": "(.*) (\\d*)\/(\\d*) (.*?) (.*)",
-            "severity": 1,
-            "line": 2,
-            "column": 3,
-            "file": 4,
-            "message": 5,
-            "loop": true
-          }
-        ]
-      }
-    },
-    {
-      "label": "oos-logger: build-3.2.0",
-      "type": "shell",
-      // Run sqlplus via a batch file
-      "osx": {
-        "command": ".vscode/scripts/build.sh"
-      },
-      "linux": {
-        "command": ".vscode/scripts/build.sh"
-      },
-      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
-      // second argument is the file to execute (ie the current file)
-      "args": [
-        "3.2.0"
-      ],
-      "group": "build",
-      // do not switch to the output pane automatically
-      "presentation": {
-        "reveal": "always", // always, never, silent
-        "panel": "dedicated" // shared, dedicated, new
-      },
+      "options": {},
       "problemMatcher": []
     },
     {
       "label": "oos-logger: install",
       "type": "shell",
-      // Run sqlplus via a batch file
-      "osx": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
-      // second argument is the file to execute (ie the current file)
+      "command": ".vscode/scripts/run_sql.sh",
       "args": [
-        "ignore", //Leave blank
-        "@install/logger_install.sql",
-        "${fileBasename}"
+        // "${relativeFile}",
+        // "${file}"
+        // Escaped double quotes are required to make compatible with Cmder in Windows
+        "\"install/logger_install.sql\"",
+        "\"${workspaceFolder}/install/logger_install.sql\""
       ],
       "group": "build",
-      // do not switch to the output pane automatically
       "presentation": {
-        "reveal": "always", // always, never, silent
-        "panel": "dedicated" // shared, dedicated, new
+        "reveal": "always",
+        "panel": "dedicated"
       },
-      "problemMatcher": {
-        "owner": "plsql",
-        "fileLocation": [
-          "relative",
-          "${workspaceFolder}/install/logger_install.sql"
-        ],
-        "pattern": {
-          "regexp": "^([A-Z0-9]{3}-)(\\d+)(: )(.*)$",
-          "file": 0,
-          "code": 2,
-          "message": 4
-        }
-      }
+      "options": {},
+      "problemMatcher": []
     },
     {
       "label": "oos-logger: uninstall",
       "type": "shell",
-      // Run sqlplus via a batch file
-      "osx": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
-      // second argument is the file to execute (ie the current file)
+      "command": ".vscode/scripts/run_sql.sh",
       "args": [
-        "ignore", //Leave blank
-        "@install/logger_uninstall.sql",
-        "${fileBasename}"
+        // "${relativeFile}",
+        // "${file}"
+        // Escaped double quotes are required to make compatible with Cmder in Windows
+        "\"install/logger_uninstall.sql\"",
+        "\"${workspaceFolder}/install/logger_uninstall.sql\""
       ],
       "group": "build",
-      // do not switch to the output pane automatically
       "presentation": {
-        "reveal": "always", // always, never, silent
-        "panel": "dedicated" // shared, dedicated, new
+        "reveal": "always",
+        "panel": "dedicated"
       },
-      // use this to get any database errors (from user_errors view) listed in the "Problems" pane in VS Code
-      "problemMatcher": {
-        "owner": "plsql",
-        "fileLocation": [
-          "relative",
-          "${workspaceFolder}/install/logger_uninstall.sql"
-        ],
-        "pattern": 
-          {
-            "regexp": "^([A-Z0-9]{3}-)(\\d+)(: )(.*)$",
-            "file": 0,
-            "code": 2,
-            "message": 4
-        }
-      }
+      "options": {},
+      "problemMatcher": []
     },
     {
       "label": "oos-logger: logger_configure",
       "type": "shell",
-      // Run sqlplus via a batch file
-      "osx": {
-        "command": ".vscode/scripts/_run_sqlplus.sh"
-      },
-      // first argument was the Oracle conneciton string. This has since moved. Leave as blank for now
-      // second argument is the file to execute (ie the current file)
+      "command": ".vscode/scripts/run_sql.sh",
       "args": [
-        "ignore", //Leave blank
-        "@.vscode/scripts/logger_configure.sql",
-        "${fileBasename}"
+        // "${relativeFile}",
+        // "${file}"
+        // Escaped double quotes are required to make compatible with Cmder in Windows
+        "\"scripts/logger_configure.sql\"",
+        "\"${workspaceFolder}/scripts/logger_configure.sql\""
       ],
       "group": "build",
-      // do not switch to the output pane automatically
       "presentation": {
-        "reveal": "always", // always, never, silent
-        "panel": "dedicated" // shared, dedicated, new
+        "reveal": "always",
+        "panel": "dedicated"
       },
+      "options": {},
       "problemMatcher": []
     }
   ]
