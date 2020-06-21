@@ -7,12 +7,13 @@ let files = {
   generateNoop: 'gen_noop.sql'
 };
 // TODO this should be moved to something specific for developers
-let sqlclConnectionString = 'sqlcl giffy/giffy@localhost:32122/orclpdb514.localdomain';
+let sqlclConnectionString = 'sqlcl giffy/giffy@localhost:32118/xepdb1';
+
 
 // TODO this should be documented in build docs
 // TODO mdsouza: should we call this something else (i.e. cmd.plmddoc) in case we get other commands?
 let cmd = {
-  plmddoc: `node ~/Documents/GitHub/oraopensource/plsql-md-doc/app.js logger`
+  plmddoc: `node ~/git/oraopensource/plsql-md-doc/app.js logger`
 };
 
 // Contexts
