@@ -371,6 +371,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   end get_sys_context;
 
 
+  -- TODO mdsouza: need to remove this from pks and make sure it's not in documentation
   /**
    * @private
    * Checks if admin functions can be run
@@ -2824,6 +2825,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   begin
     $if $$no_op $then
       null;
+
     $else
       -- Using select into to support version older than 11gR1 (see Issue 26)
       select logger_logs_seq.nextval

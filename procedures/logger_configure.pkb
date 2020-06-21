@@ -116,6 +116,9 @@ begin
   if upper(l_pref_value) = 'TRUE' then
     l_logger_debug := true;
   end if;
+
+  -- TODO mdsouza: delete
+  l_logger_debug := true;
   
   -- #46
   -- Handle plugin settings

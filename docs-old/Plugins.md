@@ -11,6 +11,7 @@ To help with performance, the plugin architecture uses conditional compilation w
 
 The following types of plugins are currently supported:
 
+<!-- TODO: Change to MD table -->
 <table>
   <tr>
     <th>Name</th>
@@ -28,6 +29,7 @@ The following types of plugins are currently supported:
 # Configuration
 There are two steps to configure a plugin. The first is to register a custom function ([more on this below](#plugin-interface)) in the logger prefs table. The following examples shows how to register a custom plugin procedure (in this example called ```custom_plugin_method```) to be run after calls to ```logger.log_error```:
 ```sql
+-- TODO change to logger.set_pref
 update logger_prefs
 set pref_value = 'custom_plugin_method'
 where 1=1
