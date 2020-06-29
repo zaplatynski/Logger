@@ -1,4 +1,0 @@
-# LOGGER
-
-- [LOGGER]()
-- [LOGGER_TEST]()
