@@ -753,10 +753,25 @@ prompt logger_logs_5_min
 
 create or replace force view logger_logs_5_min 
 as
-	select /*+ qb_name(logger_logs_5_min) */
-    ll.* 
-	from logger_logs ll
-	where 1=1
+  select /*+ qb_name(logger_logs_5_min) */
+    ll.id,
+    ll.logger_level,
+    ll.scope,
+    ll.text,
+    ll.time_stamp,
+    ll.module,
+    ll.action,
+    ll.user_name,
+    ll.client_identifier,
+    ll.call_stack,
+    ll.unit_name,
+    ll.line_no,
+    ll.scn,
+    ll.extra,
+    ll.sid,
+    ll.client_info
+  from logger_logs ll
+  where 1=1
     and ll.time_stamp > cast(systimestamp as timestamp) - (5/1440)
 /
 
@@ -765,22 +780,41 @@ prompt logger_logs_60_min
 create or replace force view logger_logs_60_min 
 as
 	select /*+ qb_name(logger_logs_60_min) */
-    ll.* 
-	from logger_logs ll
-	where 1=1
+    ll.id,
+    ll.logger_level,
+    ll.scope,
+    ll.text,
+    ll.time_stamp,
+    ll.module,
+    ll.action,
+    ll.user_name,
+    ll.client_identifier,
+    ll.call_stack,
+    ll.unit_name,
+    ll.line_no,
+    ll.scn,
+    ll.extra,
+    ll.sid,
+    ll.client_info
+  from logger_logs ll
+  where 1=1
     and ll.time_stamp > cast(systimestamp as timestamp) - (1/24)
 /
+
 
 prompt logger_logs_terse
 
 set termout off
 -- setting termout off as this view will install with an error as it depends on logger.date_text_format
 create or replace force view logger_logs_terse as
- select id, logger_level, 
-        substr(logger.date_text_format(time_stamp),1,20) time_ago,
-        substr(text,1,200) text
-   from logger_logs
-  where time_stamp > systimestamp - (5/1440)
+  select 
+    id,
+    logger_level, 
+    substr(logger.date_text_format(time_stamp),1,20) time_ago,
+    substr(text,1,200) text
+  from logger_logs
+  where 1=1
+    and time_stamp > systimestamp - (5/1440)
   order by id asc
 /
 
@@ -1628,6 +1662,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   end get_sys_context;
 
 
+  -- TODO mdsouza: need to remove this from pks and make sure it's not in documentation
   /**
    * @private
    * Checks if admin functions can be run
@@ -4081,6 +4116,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
   begin
     $if $$no_op $then
       null;
+
     $else
       -- Using select into to support version older than 11gR1 (see Issue 26)
       select logger_logs_seq.nextval
