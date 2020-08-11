@@ -800,30 +800,52 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
           l_item_type_page_id := to_number(l_item_type);
         end if;
 
-        insert into logger_logs_apex_items(log_id,app_session,item_name,item_value)
-        select p_log_id, l_app_session, item_name, item_value
+        insert into logger_logs_apex_items(
+          log_id,
+          app_session,
+          item_name,
+          item_value
+        )
+        select 
+          p_log_id, 
+          l_app_session, 
+          ai.item_name, 
+          ai.item_value
         from (
           -- Application items
-          select 1 app_page_seq, 0 page_id, item_name, v(item_name) item_value
-          from apex_application_items
+          select 
+            1 app_page_seq, 
+            0 page_id, 
+            aai.item_name, 
+            v(aai.item_name) item_value
+          from apex_application_items aai
           where 1=1
-            and application_id = l_app_id
+            and aai.application_id = l_app_id
             and l_item_type in (logger.g_apex_item_type_all, logger.g_apex_item_type_app)
           union all
           -- Application page items
-          select 2 app_page_seq, page_id, item_name, v(item_name) item_value
-          from apex_application_page_items
+          select 
+            2 app_page_seq, 
+            aapi.page_id, 
+            aapi.item_name, 
+            v(aapi.item_name) item_value
+          from apex_application_page_items aapi
           where 1=1
-            and application_id = l_app_id
+            and aapi.application_id = l_app_id
             and (
               1=2
               or l_item_type in (logger.g_apex_item_type_all, logger.g_apex_item_type_page)
               or (l_item_type_page_id is not null and l_item_type_page_id = page_id)
             )
-          )
+            -- #239 Disable logging passwords
+            and aapi.display_as_code != 'NATIVE_PASSWORD'
+          ) ai
         where 1=1
-          and (l_log_null_item_yn = 'Y' or item_value is not null)
-        order by app_page_seq, page_id, item_name;
+          and (l_log_null_item_yn = 'Y' or ai.item_value is not null)
+        order by 
+          ai.app_page_seq, 
+          ai.page_id,
+          ai.item_name;
 
       $end -- $if $$apex $then
 
