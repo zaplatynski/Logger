@@ -1519,7 +1519,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    *
    * @author Tyler Muth
    * @created ???
-   * @param p_text Text to be added to `text` column.
+   * @param p_text Text to be added to `text` column. The default text will include a query to obtain the specific APEX items
    * @param p_scope Scope to use
    * @param p_item_type Determines what type of APEX items are logged (`g_apex_item_type_...` > all, application, page). Alternatively it can reference a page_id which will then only log items on the defined page.
    * @param p_log_null_items If set to `false`, null values won't be logged
@@ -1527,14 +1527,16 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    *  Example: If set to `logger.g_error` it will work when both in `debug` and `error` modes. However if set to `logger.g_debug`(default) will not store values when `level` is set to `error`.
    */
   procedure log_apex_items(
-    p_text in varchar2 default 'Log APEX Items. Query logger_logs_apex_items and filter on log_id',
+    p_text in varchar2 default 'Logged APEX Items: select * from logger_logs_apex_items where log_id = %s1',
     p_scope in logger_logs.scope%type default null,
     p_item_type in varchar2 default logger.g_apex_item_type_all,
     p_log_null_items in boolean default true,
     p_level in logger_logs.logger_level%type default null)
   is
-    l_error varchar2(4000);
     pragma autonomous_transaction;
+    l_error varchar2(4000);
+
+    l_updated_text logger_logs.text%type;
   begin
     $if $$no_op $then
       null;
@@ -1551,6 +1553,14 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
             p_text => p_text,
             p_log_level => nvl(p_level, logger.g_apex),
             p_scope => p_scope);
+
+          l_updated_text := logger.sprintf(p_text, g_log_id);
+          if l_updated_text != p_text then 
+            update logger_logs ll
+            set ll.text = l_updated_text
+            where 1=1
+              and ll.id = g_log_id;
+          end if;
 
           snapshot_apex_items(
             p_log_id => g_log_id,
