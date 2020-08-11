@@ -1481,6 +1481,7 @@ See https://github.com/OraOpenSource/Logger/issues/128 for more info!',
    * Logs APEX items
    * This feature is useful in debugging issues in an APEX application that are related session state. 
    * The `developers toolbar` in APEX provides a place to view session state, but it won't tell you the value of items midway through page rendering or right before or after an AJAX call.
+   * *Note: APEX page items of type passwords won't be logged*
    *
    * @example
    *
