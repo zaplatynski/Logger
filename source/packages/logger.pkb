@@ -3025,6 +3025,26 @@ as
     return case p_val when true then 'TRUE' when false then 'FALSE' else null end;
   end tochar;
 
+  function tochar(
+    p_val in interval year to month)
+    return varchar2
+  as
+  begin
+    return to_char(extract(year  FROM p_val), 'fm99999') || ' years ' ||
+           to_char(extract(month FROM p_val), 'fm99')    || ' months';
+  end tochar;
+
+  function tochar(
+    p_val in interval day to second)
+    return varchar2
+  as
+  begin
+    return to_char(extract(DAY    FROM p_val), 'fmS99999') || ' ' ||
+           to_char(extract(HOUR   FROM p_val), 'fm00')     || ':' ||
+           to_char(extract(MINUTE FROM p_val), 'fm00')     || ':' ||
+           to_char(extract(SECOND FROM p_val), 'fm00.000');
+  end tochar;
+
 
 
   -- Handle Parameters
@@ -3135,6 +3155,34 @@ as
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
     p_val in boolean)
+  as
+    l_param logger.rec_param;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.append_param(p_params => p_params, p_name => p_name, p_val => logger.tochar(p_val => p_val));
+    $end
+  end append_param;
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval year to month)
+  as
+    l_param logger.rec_param;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.append_param(p_params => p_params, p_name => p_name, p_val => logger.tochar(p_val => p_val));
+    $end
+  end append_param;
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval day to second)
   as
     l_param logger.rec_param;
   begin

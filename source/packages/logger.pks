@@ -326,8 +326,18 @@ as
     p_name in varchar2,
     p_val in boolean);
 
-  function ok_to_log(p_level in number,
-    p_scope in varchar2 default null)
+  -- PBA 20211230 added interval types to overloading
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval year to month);
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval day to second);
+
+  function ok_to_log(p_level in number)
     return boolean;
 
   function ok_to_log(p_level in varchar2,
@@ -356,6 +366,14 @@ as
 
   function tochar(
     p_val in boolean)
+    return varchar2;
+
+  function tochar(
+    p_val in interval year to month)
+    return varchar2;
+
+  function tochar(
+    p_val in interval day to second)
     return varchar2;
 
   procedure ins_logger_logs(
