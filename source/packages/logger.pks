@@ -337,7 +337,8 @@ as
     p_name in varchar2,
     p_val in interval day to second);
 
-  function ok_to_log(p_level in number)
+  function ok_to_log(p_level in number,
+    p_scope in varchar2 default null)
     return boolean;
 
   function ok_to_log(p_level in varchar2,
