@@ -32,13 +32,31 @@ as
 
   -- TYPES
   type ts_array is table of timestamp index by varchar2(100);
-
+  type log_rec is record(
+    id                logger_logs.id%type
+  , logger_level      logger_logs.logger_level%type
+  , text              varchar2(32767) default null -- Not using type since want to be able to pass in 32767 characters
+  , time_stamp        logger_logs.time_stamp%type default systimestamp
+  , scope             logger_logs.scope%type default null
+  , module            logger_logs.module%type default null
+  , action            logger_logs.action%type default null
+  , user_name         logger_logs.user_name%type default null
+  , client_identifier logger_logs.client_identifier%type default null
+  , call_stack        logger_logs.call_stack%type default null
+  , unit_name         logger_logs.unit_name%type default null
+  , line_no           logger_logs.line_no%type default null
+  , scn               logger_logs.scn%type default null
+  , extra             logger_logs.extra%type default null
+  , sid               logger_logs.sid%type default null
+  , client_info       logger_logs.client_info%type default null
+  );
+  type log_aat is table of log_rec index by pls_integer;
 
   -- VARIABLES
   g_log_id number;
   g_proc_start_times ts_array;
   g_running_timers pls_integer := 0;
-
+  g_internal_log log_aat;
   -- #46
   g_plug_logger_log_error rec_logger_log;
 
@@ -55,9 +73,13 @@ as
   gc_date_format constant varchar2(255) := 'DD-MON-YYYY HH24:MI:SS';
   gc_timestamp_format constant varchar2(255) := gc_date_format || ':FF';
   gc_timestamp_tz_format constant varchar2(255) := gc_timestamp_format || ' TZR';
-
+  gc_default_logger_aa_size constant number := 100; -- PBA 20200316
+  gc_default_logger_aa_prefix constant varchar2(100) := ''; -- PBA 20200316
+  gc_default_logger_aa_suffix constant varchar2(100) := ''; -- PBA 20200316
+    
   gc_ctx_attr_level constant varchar2(5) := 'level';
   gc_ctx_attr_include_call_stack constant varchar2(18) := 'include_call_stack';
+  gc_ctx_attr_scope constant varchar2(5) := 'scope';
 
   -- #46 Plugin context names
   gc_ctx_plugin_fn_log constant varchar2(30) := 'plugin_fn_log';
@@ -77,7 +99,9 @@ as
   gc_pref_client_id_expire_hours constant logger_prefs.pref_name%type := 'PREF_BY_CLIENT_ID_EXPIRE_HOURS';
   gc_pref_logger_debug constant logger_prefs.pref_name%type := 'LOGGER_DEBUG';
   gc_pref_plugin_fn_error constant logger_prefs.pref_name%type := 'PLUGIN_FN_ERROR';
-
+  gc_pref_logger_aa_size constant logger_prefs.pref_name%type := 'LOGGER_AA_SIZE'; -- PBA 20200316
+  gc_pref_logger_aa_prefix constant logger_prefs.pref_name%type := 'LOGGER_AA_PREFIX'; -- PBA 20200316
+  gc_pref_logger_aa_suffix constant logger_prefs.pref_name%type := 'LOGGER_AA_SUFFIX'; -- PBA 20200316
 
 
 
@@ -435,19 +459,137 @@ as
    * Notes:
    *  - Private
    *
+   * @author Patrick Barel
+   * @created 20200316
+   * @return The number of messages to save in the Associative Array
+   */
+  function get_logger_aa_size
+    return number
+    $if $$rac_lt_11_2 $then
+      $if not dbms_db_version.ver_le_10_2 $then
+        result_cache relies_on (logger_prefs)
+      $end
+    $end
+  is
+    l_size number;
+
+    $if $$logger_debug $then
+      l_scope varchar2(30) := 'get_logger_aa_size';
+    $end
+
+  begin
+    $if $$no_op $then
+      return gc_default_aa_size;
+    $else
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ': selecting logger AA Size');
+      $end
+
+      l_size := nvl(logger.get_pref(p_pref_name => logger.gc_pref_logger_aa_size
+      ,p_pref_type => logger.g_pref_type_logger_aa),gc_default_logger_aa_size);
+
+      return l_size;
+    $end
+  end get_logger_aa_size;
+
+
+  /**
+   *
+   *
+   * Notes:
+   *  - Private
+   *
+   * @author Patrick Barel
+   * @created 20200316
+   * @return The suffix which get added to the scope column
+   */
+  function get_logger_aa_prefix
+    return varchar2
+    $if $$rac_lt_11_2 $then
+      $if not dbms_db_version.ver_le_10_2 $then
+        result_cache relies_on (logger_prefs)
+      $end
+    $end
+  is
+    l_prefix varchar2(100);
+
+    $if $$logger_debug $then
+      l_scope varchar2(30) := 'get_logger_aa_prefix';
+    $end
+
+  begin
+    $if $$no_op $then
+      return gc_default_aa_prefix;
+    $else
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ': selecting logger AA Prefix');
+      $end
+
+      l_prefix := nvl(logger.get_pref(p_pref_name => logger.gc_pref_logger_aa_prefix
+      ,p_pref_type => logger.g_pref_type_logger_aa),gc_default_logger_aa_prefix);
+
+      return l_prefix;
+    $end
+  end get_logger_aa_prefix;
+
+
+  /**
+   *
+   *
+   * Notes:
+   *  - Private
+   *
+   * @author Patrick Barel
+   * @created 20200316
+   * @return The suffix which get added to the scope column
+   */
+  function get_logger_aa_suffix
+    return varchar2
+    $if $$rac_lt_11_2 $then
+      $if not dbms_db_version.ver_le_10_2 $then
+        result_cache relies_on (logger_prefs)
+      $end
+    $end
+  is
+    l_suffix varchar2(100);
+
+    $if $$logger_debug $then
+      l_scope varchar2(30) := 'get_logger_aa_suffix';
+    $end
+
+  begin
+    $if $$no_op $then
+      return gc_default_aa_suffix;
+    $else
+      $if $$logger_debug $then
+        dbms_output.put_line(l_scope || ': selecting logger AA Suffix');
+      $end
+
+      l_suffix := nvl(logger.get_pref(p_pref_name => logger.gc_pref_logger_aa_suffix
+      ,p_pref_type => logger.g_pref_type_logger_aa),gc_default_logger_aa_suffix);
+
+      return l_suffix;
+    $end
+  end get_logger_aa_suffix;
+  /**
+   *
+   *
+   * Notes:
+   *  - Private
+   *
    * Related Tickets:
    *  - #111 Use get_pref to remove duplicate code
    *
    * @author Tyler Muth
    * @created ???
-   * @param
+   * @param p_scope
    * @return If client level specified will return it, otherwise global level.
    */
-  function get_level_number
+  function get_level_number(p_scope in varchar2 default null) -- PBA/MNU 201704
     return number
     $if $$rac_lt_11_2 $then
       $if not dbms_db_version.ver_le_10_2 $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+        result_cache relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
       $end
     $end
   is
@@ -466,7 +608,8 @@ as
         dbms_output.put_line(l_scope || ': selecting logger_level');
       $end
 
-      l_level := convert_level_char_to_num(logger.get_pref(logger.gc_pref_level));
+      l_level := convert_level_char_to_num(logger.get_pref(p_pref_name => logger.gc_pref_level
+                                                          ,p_scope => p_scope)); -- PBA/MNU 201704
 
       return l_level;
     $end
@@ -604,6 +747,184 @@ as
       o_unit := trim(substr( l_callstack, instr( l_callstack, ' ', -1, 1 ) ));
     $end
   end get_debug_info;
+
+  /**
+   * Procedure to dump the info of the AA into the table
+   *
+   *
+   * @author Patrick Barel
+   * @created 2020-03-15
+   *
+   */
+  procedure aa_dump_log is
+    pragma autonomous_transaction;
+
+--    l_id logger_logs.id%type;
+--    l_text varchar2(32767); -- := p_text;
+--    l_extra logger_logs.extra%type; -- := p_extra;
+--    l_tmp_clob clob;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      -- PBA 20200316 update the scope with the prefix and the suffix
+      for indx in g_internal_log.first .. g_internal_log.last loop
+        g_internal_log(indx).scope := trim(both ' ' from get_logger_aa_prefix || g_internal_log(indx).scope || get_logger_aa_suffix);
+      end loop;
+      --
+      forall indx in g_internal_log.first .. g_internal_log.last
+      insert into logger_logs(
+        id, logger_level, text,
+        time_stamp, scope, module,
+        action,
+        user_name,
+        client_identifier,
+        call_stack, unit_name, line_no ,
+        scn,
+        extra,
+        sid,
+        client_info
+        )
+       values(
+         logger_logs_seq.nextval, g_internal_log(indx).logger_level, g_internal_log(indx).text,
+         g_internal_log(indx).time_stamp, lower(g_internal_log(indx).scope), sys_context('userenv','module'),
+         sys_context('userenv','action'),
+         nvl($if $$apex $then apex_application.g_user $else user $end,user),
+         sys_context('userenv','client_identifier'),
+         g_internal_log(indx).call_stack, upper(g_internal_log(indx).unit_name), g_internal_log(indx).line_no,
+         null,
+         g_internal_log(indx).extra,
+         to_number(sys_context('userenv','sid')),
+         sys_context('userenv','client_info')
+         );
+        -- as soon as everything got dumped, clean out the AA
+        g_internal_log.delete;
+    $end -- $$NO_OP
+
+    commit;
+  end aa_dump_log;
+  /**
+   * Procedure that will store log data into the AA. It will also check that there will not be more than
+   * the designated number of items.
+   *
+   *
+   * @author Patrick Barel
+   * @created 2020-03-15
+   * @param p_unit_name
+   * @param p_scope
+   * @param p_log_level
+   * @param p_extra
+   * @param p_text
+   * @param p_callstack
+   * @param p_line_no
+   *
+   */
+  procedure aa_add_log(p_unit_name    in logger_logs.unit_name%type default null
+                      ,p_scope        in logger_logs.scope%type default null
+                      ,p_logger_level in logger_logs.logger_level%type
+                      ,p_extra        in logger_logs.extra%type default null
+                      ,p_text         in varchar2 default null -- Not using type since want to be able to pass in 32767 characters
+                      ,p_call_stack   in logger_logs.call_stack%type default null
+                      ,p_line_no      in logger_logs.line_no%type default null) is
+    l_text varchar2(32767) := p_text;
+    l_extra logger_logs.extra%type := p_extra;
+    l_tmp_clob clob;
+  begin
+      $if $$large_text_column $then -- Only check for moving to Clob if small text column
+        -- Don't do anything since column supports large text
+      $else
+        if lengthb(l_text) > 4000 then -- #109 Using lengthb for multibyte characters
+          if l_extra is null then
+            l_extra := l_text;
+          else
+            -- Using temp clob for performance purposes: http://www.talkapex.com/2009/06/how-to-quickly-append-varchar2-to-clob.html
+            l_tmp_clob := gc_line_feed || gc_line_feed || '*** Content moved from TEXT column ***' || gc_line_feed;
+            l_extra := l_extra || l_tmp_clob;
+            l_tmp_clob := l_text;
+            -- PBA 20200315 I think the temp clob should be copied instead of the orginal text
+--            l_extra := l_extra || l_text;
+            l_extra := l_extra || l_tmp_clob;
+          end if; -- l_extra is not null
+
+          l_text := 'Text moved to EXTRA column';
+        end if; -- length(l_text)
+      $end
+
+    -- add a record to the AA
+    g_internal_log(nvl(g_internal_log.last,0) + 1).unit_name := p_unit_name;
+    g_internal_log(g_internal_log.last).scope         := p_scope;
+    g_internal_log(g_internal_log.last).logger_level  := p_logger_level;
+    g_internal_log(g_internal_log.last).extra         := l_extra;
+    g_internal_log(g_internal_log.last).text          := l_text;
+    g_internal_log(g_internal_log.last).call_stack    := p_call_stack;
+    g_internal_log(g_internal_log.last).line_no       := p_line_no;
+    g_internal_log(g_internal_log.last).time_stamp    := systimestamp;
+    -- check if we have more than the AA size records
+    if g_internal_log.count > get_logger_aa_size then
+      -- then delete the first one
+      g_internal_log.delete(g_internal_log.first);
+    end if;
+  end aa_add_log;
+--
+  /**
+   * Main procedure that will store log data into an AA, for later use
+   *
+   *
+   * @author Patrick Barel
+   * @created 20200315
+   * @param p_text
+   * @param p_log_level
+   * @param p_scope
+   * @param p_extra
+   * @param p_callstack
+   * @param p_params
+   *
+   */
+  procedure aa_log(
+    p_text in varchar2,
+    p_log_level in number,
+    p_scope in varchar2,
+    p_extra in clob default null,
+    p_callstack in varchar2 default null,
+    p_params in tab_param default logger.gc_empty_tab_param)
+  is
+    l_proc_name varchar2(100);
+    l_lineno varchar2(100);
+    l_text varchar2(32767);
+    l_callstack varchar2(3000);
+    l_extra logger_logs.extra%type;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      l_text := p_text;
+
+      -- Generate callstack text
+      if p_callstack is not null and logger.include_call_stack then
+        logger.get_debug_info(
+          p_callstack => p_callstack,
+          o_unit => l_proc_name,
+          o_lineno => l_lineno);
+
+        l_callstack  := regexp_replace(p_callstack,'^.*$','',1,4,'m');
+        l_callstack  := regexp_replace(l_callstack,'^.*$','',1,1,'m');
+        l_callstack  := ltrim(replace(l_callstack,chr(10)||chr(10),chr(10)),chr(10));
+
+      end if;
+
+      l_extra := set_extra_with_params(p_extra => p_extra, p_params => p_params);
+
+      -- save all the info into the AA
+      aa_add_log(
+        p_unit_name => upper(l_proc_name) ,
+        p_scope => p_scope ,
+        p_logger_level =>p_log_level,
+        p_extra => l_extra,
+        p_text =>l_text,
+        p_call_stack  =>l_callstack,
+        p_line_no => l_lineno);
+    $end
+  end aa_log;
 
 
   /**
@@ -929,15 +1250,17 @@ as
    * @created ???
    *
    * @param p_level Level (number)
+   * @param p_scope 
    * @return True of statement can be logged to LOGGER_LOGS
    */
-  function ok_to_log(p_level in number)
+  function ok_to_log(p_level in number,
+    p_scope in varchar2 default null)
     return boolean
     $if 1=1
       and $$rac_lt_11_2
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
-        result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
+        result_cache relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
     $end
   is
     l_level number;
@@ -960,21 +1283,31 @@ as
         $if $$logger_debug $then
           dbms_output.put_line(l_scope || ': calling get_level_number');
         $end
-        l_level := get_level_number;
+        l_level := get_level_number(p_scope => p_scope); -- PBA/MNU 201704
       $else
-        l_level := sys_context(g_context_name,gc_ctx_attr_level);
+          l_level := sys_context(g_context_name,gc_ctx_attr_level);
+        
+        -- PBA/MNU 201704
+        -- if the current scope is different from the saved scope (context) then clear the level
+        -- (only applies to non-empty scopes)
+        if coalesce(sys_context(g_context_name,gc_ctx_attr_scope),'#^') <> coalesce(p_scope,'#^') then
+          l_level := null;
+        end if;
 
         if l_level is null then
           $if $$logger_debug $then
             dbms_output.put_line(l_scope || ': level was null, getting and setting in context');
           $end
 
-          l_level := get_level_number;
+          l_level := get_level_number(p_scope => p_scope); -- PBA/MNU 201704
 
           save_global_context(
             p_attribute => gc_ctx_attr_level,
             p_value => l_level,
             p_client_id => sys_context('userenv','client_identifier'));
+          save_global_context(
+            p_attribute => gc_ctx_attr_scope,
+            p_value => p_scope);
         end if;
       $end
 
@@ -994,16 +1327,19 @@ as
    * @created 25-Jul-2013
    *
    * @param p_level Level (DEBUG etc..)
+   * @param p_scope 
    * @return True of log statements for that level or below will be logged
    */
-  function ok_to_log(p_level in varchar2)
+  function ok_to_log(p_level in varchar2,
+    p_scope in varchar2 default null)
     return boolean
   as
   begin
     $if $$no_op $then
       return false;
     $else
-      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level));
+      return ok_to_log(p_level => convert_level_char_to_num(p_level => p_level)
+                      ,p_scope => p_scope);
     $end
   end ok_to_log;
 
@@ -1182,7 +1518,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_error) then
+--      if ok_to_log(logger.g_error) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_error, p_scope) then
         get_debug_info(
           p_callstack => dbms_utility.format_call_stack,
           o_unit => l_proc_name,
@@ -1222,6 +1559,8 @@ as
             run_plugin(p_logger_log => g_plug_logger_log_error);
           end if; -- not g_in_plugin_error
         $end
+        -- PBA 20200315: When we log an error, also dump the AA
+        aa_dump_log;
 
       end if; -- ok_to_log
     $end
@@ -1254,7 +1593,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_permanent) then
+--      if ok_to_log(logger.g_permanent) then  -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_permanent, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_permanent,
@@ -1264,6 +1604,14 @@ as
           p_params => p_params
         );
       end if;
+      -- PBA 20200315 Always log in the AA internally
+      aa_log(
+          p_text => p_text,
+          p_log_level => logger.g_debug,
+          p_scope => p_scope,
+          p_extra => p_extra,
+          p_callstack => dbms_utility.format_call_stack,
+          p_params => p_params);
     $end
   end log_permanent;
 
@@ -1294,7 +1642,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_warning) then
+--      if ok_to_log(logger.g_warning) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_warning, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_warning,
@@ -1302,6 +1651,15 @@ as
           p_extra => p_extra,
           p_callstack => dbms_utility.format_call_stack,
           p_params => p_params);
+      else
+        -- PBA 20200315 If we don't log in the table, we always log in the AA internally
+        aa_log(
+            p_text => p_text,
+            p_log_level => logger.g_warning,
+            p_scope => p_scope,
+            p_extra => p_extra,
+            p_callstack => dbms_utility.format_call_stack,
+            p_params => p_params);
       end if;
     $end
   end log_warning;
@@ -1364,7 +1722,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_information) then
+--      if ok_to_log(logger.g_information) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_information, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_information,
@@ -1372,6 +1731,15 @@ as
           p_extra => p_extra,
           p_callstack => dbms_utility.format_call_stack,
           p_params => p_params);
+      else
+        -- PBA 20200315 If we don't log in the table, we always log in the AA internally
+        aa_log(
+            p_text => p_text,
+            p_log_level => logger.g_information,
+            p_scope => p_scope,
+            p_extra => p_extra,
+            p_callstack => dbms_utility.format_call_stack,
+            p_params => p_params);
       end if;
     $end
   end log_information;
@@ -1436,7 +1804,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         log_internal(
           p_text => p_text,
           p_log_level => logger.g_debug,
@@ -1444,6 +1813,15 @@ as
           p_extra => p_extra,
           p_callstack => dbms_utility.format_call_stack,
           p_params => p_params);
+      else
+        -- PBA 20200315 If we don't log in the table, we always log in the AA internally
+        aa_log(
+            p_text => p_text,
+            p_log_level => logger.g_debug,
+            p_scope => p_scope,
+            p_extra => p_extra,
+            p_callstack => dbms_utility.format_call_stack,
+            p_params => p_params);
       end if;
     $end
   end log;
@@ -1525,7 +1903,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_extra := get_sys_context(
           p_detail_level => p_detail_level,
           p_vertical => true,
@@ -1566,7 +1945,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_extra := get_cgi_env(p_show_null    => p_show_null);
         log_internal(
           p_text => 'CGI ENV values stored in the EXTRA column',
@@ -1606,7 +1986,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
         l_dump := get_character_codes(p_text,p_show_common_codes);
 
         log_internal(
@@ -1651,7 +2032,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(nvl(p_level, logger.g_debug)) then
+--      if ok_to_log(nvl(p_level, logger.g_debug)) then -- PBA 20190428 take the scope into account
+      if ok_to_log(nvl(p_level, logger.g_debug), p_scope) then
 
         $if $$apex $then
           -- Validate p_item_type
@@ -1755,7 +2137,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
 
           if g_running_timers > 1 then
@@ -1810,7 +2193,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
 
           l_time_string := rtrim(regexp_replace(localtimestamp - (g_proc_start_times(p_unit)),'.+?[[:space:]](.*)','\1',1,0),0);
@@ -1866,7 +2250,8 @@ as
     $if $$no_op $then
       null;
     $else
-      if ok_to_log(logger.g_debug) then
+--      if ok_to_log(logger.g_debug) then -- PBA 20190428 take the scope into account
+      if ok_to_log(logger.g_debug, p_scope) then
         if g_proc_start_times.exists(p_unit) then
           l_interval := localtimestamp - (g_proc_start_times(p_unit));
           l_seconds := extract(day from l_interval) * 86400 + extract(hour from l_interval) * 3600 + extract(minute from l_interval) * 60 + extract(second from l_interval);
@@ -1936,12 +2321,14 @@ as
    */
   function get_pref(
     p_pref_name in logger_prefs.pref_name%type,
-    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger)
+    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger,
+    p_scope in varchar2 default null -- PBA/MNU 201704
+    )
     return varchar2
     $if not dbms_db_version.ver_le_10_2  $then
       result_cache
       $if $$no_op is null or not $$no_op $then
-        relies_on (logger_prefs, logger_prefs_by_client_id)
+        relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
       $end
     $end
   is
@@ -1950,6 +2337,10 @@ as
     l_client_id logger_prefs_by_client_id.client_id%type;
     l_pref_name logger_prefs.pref_name%type := upper(p_pref_name);
     l_pref_type logger_prefs.pref_type%type := upper(p_pref_type);
+     -- PBA/MNU 201704
+     -- p_scope is entered as lowercase in the table so make the parameter lowercase here
+     -- l_scope is already used, so we use lp_scope
+    lp_scope logger_prefs_by_scope.logger_scope%type := lower(p_scope);
   begin
 
     $if $$no_op $then
@@ -1966,6 +2357,18 @@ as
       from (
         select pref_value, row_number () over (order by rank) rn
         from (
+          -- Scope specific logger levels trump client specific AND system level loggel level
+          select pref_value
+               , 0 rank
+            from (select logger_level pref_value
+                    from logger_prefs_by_scope
+                   where 1 = 1
+                     and l_pref_name = logger.gc_pref_level
+                     and lp_scope like logger_scope
+                   order by length(logger_scope) desc)
+           where 1 = 1
+             and rownum <= 1
+          union all
           -- Client specific logger levels trump system level logger level
           select
             case
@@ -2622,6 +3025,26 @@ as
     return case p_val when true then 'TRUE' when false then 'FALSE' else null end;
   end tochar;
 
+  function tochar(
+    p_val in interval year to month)
+    return varchar2
+  as
+  begin
+    return to_char(extract(year  FROM p_val), 'fm99999') || ' years ' ||
+           to_char(extract(month FROM p_val), 'fm99')    || ' months';
+  end tochar;
+
+  function tochar(
+    p_val in interval day to second)
+    return varchar2
+  as
+  begin
+    return to_char(extract(DAY    FROM p_val), 'fmS99999') || ' ' ||
+           to_char(extract(HOUR   FROM p_val), 'fm00')     || ':' ||
+           to_char(extract(MINUTE FROM p_val), 'fm00')     || ':' ||
+           to_char(extract(SECOND FROM p_val), 'fm00.000');
+  end tochar;
+
 
 
   -- Handle Parameters
@@ -2732,6 +3155,34 @@ as
     p_params in out nocopy logger.tab_param,
     p_name in varchar2,
     p_val in boolean)
+  as
+    l_param logger.rec_param;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.append_param(p_params => p_params, p_name => p_name, p_val => logger.tochar(p_val => p_val));
+    $end
+  end append_param;
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval year to month)
+  as
+    l_param logger.rec_param;
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      logger.append_param(p_params => p_params, p_name => p_name, p_val => logger.tochar(p_val => p_val));
+    $end
+  end append_param;
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval day to second)
   as
     l_param logger.rec_param;
   begin
@@ -2952,5 +3403,24 @@ as
     end if;
   end get_plugin_rec;
 
+ /**
+   * Unsets scope_level that are stale (i.e. past their expiry date)
+   *
+   * @author Patrick Barel/Milco Numan
+   * @created 18-Apr-2017
+   */
+  procedure unset_scope_level
+  as
+  begin
+    $if $$no_op $then
+      null;
+    $else
+      delete
+        from logger_prefs_by_scope
+       where sysdate > expiry_date
+      ;
+      commit;
+    $end
+  end unset_scope_level;
 end logger;
 /

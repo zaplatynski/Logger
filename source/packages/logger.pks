@@ -29,7 +29,9 @@ as
   -- TYPES
   type rec_param is record(
     name varchar2(255),
-    val varchar2(4000));
+--    val varchar2(4000));
+    val varchar2(32767) -- PBA: This is enlarged, since it is stored in a CLOB anyway
+    );
 
   type tab_param is table of rec_param index by binary_integer;
 
@@ -40,16 +42,16 @@ as
 
 
   -- VARIABLES
-	g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
-	g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
+  g_logger_version constant varchar2(10) := 'x.x.x'; -- Don't change this. Build script will replace with right version number
+  g_context_name constant varchar2(35) := substr(sys_context('USERENV','CURRENT_SCHEMA'),1,23)||'_LOGCTX';
 
   g_off constant number := 0;
   g_permanent constant number := 1;
-	g_error constant number := 2;
-	g_warning constant number := 4;
-	g_information constant number := 8;
+  g_error constant number := 2;
+  g_warning constant number := 4;
+  g_information constant number := 8;
   g_debug constant number := 16;
-	g_timing constant number := 32;
+  g_timing constant number := 32;
   g_sys_context constant number := 64;
   g_apex constant number := 128;
 
@@ -75,6 +77,7 @@ as
   -- #127
   -- Note to developers: This is only for internal Logger code. Do not use this as part of your code.
   g_pref_type_logger constant logger_prefs.pref_type%type := 'LOGGER'; -- If this changes need to modify logger_prefs.sql as it has a dependancy.
+  g_pref_type_logger_aa constant logger_prefs.pref_type%type := 'LOGGER_AA'; -- PBA 20200316
 
   -- Expose private functions only for testing during development
   $if $$logger_debug $then
@@ -107,8 +110,8 @@ as
     function admin_security_check
       return boolean;
 
-    function get_level_number
-      return number;
+--    function get_level_number(p_scope in varchar2 default null)
+--      return number;
 
     function include_call_stack
       return boolean;
@@ -142,9 +145,9 @@ as
   function date_text_format (p_date in date)
     return varchar2;
 
-	function get_character_codes(
-		p_string 				in varchar2,
-		p_show_common_codes 	in boolean default true)
+  function get_character_codes(
+    p_string        in varchar2,
+    p_show_common_codes   in boolean default true)
     return varchar2;
 
   procedure log_error(
@@ -190,8 +193,8 @@ as
     p_params  in tab_param default logger.gc_empty_tab_param);
 
   function get_cgi_env(
-    p_show_null		in boolean default false)
-  	return clob;
+    p_show_null   in boolean default false)
+    return clob;
 
   procedure log_userenv(
     p_detail_level in varchar2 default 'USER',-- ALL, NLS, USER, INSTANCE,
@@ -217,12 +220,12 @@ as
       p_log_null_items in boolean default true,
       p_level in logger_logs.logger_level%type default null);
 
-	procedure time_start(
-		p_unit in varchar2,
+  procedure time_start(
+    p_unit in varchar2,
     p_log_in_table in boolean default true);
 
-	procedure time_stop(
-		p_unit in varchar2,
+  procedure time_stop(
+    p_unit in varchar2,
     p_scope in varchar2 default null);
 
   function time_stop(
@@ -241,7 +244,8 @@ as
 
   function get_pref(
     p_pref_name in logger_prefs.pref_name%type,
-    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger)
+    p_pref_type in logger_prefs.pref_type%type default logger.g_pref_type_logger,
+    p_scope in varchar2 default null)
     return varchar2
     $if not dbms_db_version.ver_le_10_2  $then
       result_cache
@@ -258,18 +262,18 @@ as
     p_pref_type in logger_prefs.pref_type%type,
     p_pref_name in logger_prefs.pref_name%type);
 
-	procedure purge(
-		p_purge_after_days in varchar2 default null,
-		p_purge_min_level	in varchar2	default null);
+  procedure purge(
+    p_purge_after_days in varchar2 default null,
+    p_purge_min_level in varchar2 default null);
 
   procedure purge(
     p_purge_after_days in number default null,
     p_purge_min_level in number);
 
-	procedure purge_all;
+  procedure purge_all;
 
-	procedure status(
-		p_output_format	in varchar2 default null); -- SQL-DEVELOPER | HTML | DBMS_OUPUT
+  procedure status(
+    p_output_format in varchar2 default null); -- SQL-DEVELOPER | HTML | DBMS_OUPUT
 
   procedure sqlplus_format;
 
@@ -322,10 +326,23 @@ as
     p_name in varchar2,
     p_val in boolean);
 
-  function ok_to_log(p_level in number)
+  -- PBA 20211230 added interval types to overloading
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval year to month);
+
+  procedure append_param(
+    p_params in out nocopy logger.tab_param,
+    p_name in varchar2,
+    p_val in interval day to second);
+
+  function ok_to_log(p_level in number,
+    p_scope in varchar2 default null)
     return boolean;
 
-  function ok_to_log(p_level in varchar2)
+  function ok_to_log(p_level in varchar2,
+    p_scope in varchar2 default null)
     return boolean;
 
   function tochar(
@@ -350,6 +367,14 @@ as
 
   function tochar(
     p_val in boolean)
+    return varchar2;
+
+  function tochar(
+    p_val in interval year to month)
+    return varchar2;
+
+  function tochar(
+    p_val in interval day to second)
     return varchar2;
 
   procedure ins_logger_logs(
@@ -381,5 +406,11 @@ as
   function get_plugin_rec(
     p_logger_level in logger_logs.logger_level%type)
     return logger.rec_logger_log;
+
+  procedure unset_scope_level;
+
+  -- PBA 20190414 062841 expose this function to be used in testing routine
+  function get_level_number(p_scope in varchar2 default null)
+    return number;
 end logger;
 /

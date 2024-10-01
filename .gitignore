@@ -7,5 +7,9 @@ releases/*
 !releases/*.zip
 #For developers
 temp/*
+Sandbox/
 #For IMDone Atom.io plugin
 .imdone/*
+*.tst
+*.dsk
+*.prj
