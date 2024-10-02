@@ -76,7 +76,7 @@ as
   gc_default_logger_aa_size constant number := 100; -- PBA 20200316
   gc_default_logger_aa_prefix constant varchar2(100) := ''; -- PBA 20200316
   gc_default_logger_aa_suffix constant varchar2(100) := ''; -- PBA 20200316
-    
+
   gc_ctx_attr_level constant varchar2(5) := 'level';
   gc_ctx_attr_include_call_stack constant varchar2(18) := 'include_call_stack';
   gc_ctx_attr_scope constant varchar2(5) := 'scope';
@@ -1079,7 +1079,7 @@ as
 
       if 1=1
         and l_plugin_fn is not null
-        and l_plugin_fn != 'NONE' then
+        and l_plugin_fn <> 'NONE' then
 
         l_sql := 'begin ' || l_plugin_fn || '(logger.get_plugin_rec(' || p_logger_log.logger_level || ')); end;';
 
@@ -1250,7 +1250,7 @@ as
    * @created ???
    *
    * @param p_level Level (number)
-   * @param p_scope 
+   * @param p_scope
    * @return True of statement can be logged to LOGGER_LOGS
    */
   function ok_to_log(p_level in number,
@@ -1286,7 +1286,7 @@ as
         l_level := get_level_number(p_scope => p_scope); -- PBA/MNU 201704
       $else
           l_level := sys_context(g_context_name,gc_ctx_attr_level);
-        
+
         -- PBA/MNU 201704
         -- if the current scope is different from the saved scope (context) then clear the level
         -- (only applies to non-empty scopes)
@@ -1327,7 +1327,7 @@ as
    * @created 25-Jul-2013
    *
    * @param p_level Level (DEBUG etc..)
-   * @param p_scope 
+   * @param p_scope
    * @return True of log statements for that level or below will be logged
    */
   function ok_to_log(p_level in varchar2,
