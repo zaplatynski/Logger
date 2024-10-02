@@ -65,8 +65,7 @@ begin
     :new.pref_name := upper(:new.pref_name);
     :new.pref_type := upper(:new.pref_type);
 
-    if 1=1
-      and :new.pref_type = logger.g_pref_type_logger
+    if    :new.pref_type = logger.g_pref_type_logger
       and :new.pref_name = 'LEVEL' then
       :new.pref_value := upper(:new.pref_value);
     end if;
@@ -75,8 +74,7 @@ begin
     -- #TODO:100 mdsouza: if removing then decrease indent
     -- $if $$currently_installing is null or not $$currently_installing $then
       -- Since logger.pks may not be installed when this trigger is compiled, need to move some code here
-      if 1=1
-        and :new.pref_type = logger.g_pref_type_logger
+      if    :new.pref_type = logger.g_pref_type_logger
         and :new.pref_name = 'LEVEL'
         and upper(:new.pref_value) not in (logger.g_off_name, logger.g_permanent_name, logger.g_error_name, logger.g_warning_name, logger.g_information_name, logger.g_debug_name, logger.g_timing_name, logger.g_sys_context_name, logger.g_apex_name) then
         raise_application_error(-20000, '"LEVEL" must be one of the following values: ' ||
@@ -86,8 +84,7 @@ begin
       end if;
 
       -- Allow for null to be used for Plugins, then default to NONE
-      if 1=1
-        and :new.pref_type = logger.g_pref_type_logger
+      if    :new.pref_type = logger.g_pref_type_logger
         and :new.pref_name like 'PLUGIN_FN%'
         and :new.pref_value is null then
         :new.pref_value := 'NONE';
@@ -96,8 +93,7 @@ begin
       -- #103
       -- Only predefined preferences and Custom Preferences are allowed
       -- Custom Preferences must be prefixed with CUST_
-      if 1=1
-        and :new.pref_type = logger.g_pref_type_logger
+      if    :new.pref_type = logger.g_pref_type_logger
         and :new.pref_name not in (
           'GLOBAL_CONTEXT_NAME'
           ,'INCLUDE_CALL_STACK'
@@ -184,8 +180,7 @@ begin
     select count(1)
     into l_count
     from user_tab_columns
-    where 1=1
-      and upper(table_name) = upper('logger_prefs')
+    where upper(table_name) = upper('logger_prefs')
       and column_name = l_new_cols(i).column_name;
 
     if l_count = 0 then
@@ -214,8 +209,7 @@ begin
   select count(*)
   into l_count
   from user_cons_columns
-  where 1=1
-    and constraint_name = 'LOGGER_PREFS_PK'
+  where constraint_name = 'LOGGER_PREFS_PK'
     and column_name != 'PREF_NAME';
 
   if l_count = 0 then
@@ -259,16 +253,14 @@ begin
   set
     pref_name = upper(pref_name),
     pref_type = upper(pref_type)
-  where 1=1
-    or pref_name != upper(pref_name)
-    or pref_type != upper(pref_type);
+  where pref_name != upper(pref_name)
+     or pref_type != upper(pref_type);
 
   for i in l_constraints.first .. l_constraints.last loop
     select count(1)
     into l_count
     from user_constraints
-    where 1=1
-      and table_name = 'LOGGER_PREFS'
+    where table_name = 'LOGGER_PREFS'
       and constraint_name = l_constraints(i).name;
 
     if l_count = 0 then
