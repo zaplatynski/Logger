@@ -13,3 +13,5 @@ Sandbox/
 *.tst
 *.dsk
 *.prj
+# Eclipse
+/.project
