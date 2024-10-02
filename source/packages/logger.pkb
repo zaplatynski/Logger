@@ -2354,12 +2354,10 @@ as
                , 0 rank
             from (select logger_level pref_value
                     from logger_prefs_by_scope
-                   where 1 = 1
-                     and l_pref_name = logger.gc_pref_level
+                   where l_pref_name = logger.gc_pref_level
                      and lp_scope like logger_scope
                    order by length(logger_scope) desc)
-           where 1 = 1
-             and rownum <= 1
+           where rownum <= 1
           union all
           -- Client specific logger levels trump system level logger level
           select

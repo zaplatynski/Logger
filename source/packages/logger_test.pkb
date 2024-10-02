@@ -197,7 +197,7 @@ as
 
     exception
       when others then
-        if sqlerrm != 'ORA-20000: message' then
+        if sqlerrm <> 'ORA-20000: message' then
           util_add_error('Invalid error message');
         end if;
     end;
@@ -216,7 +216,7 @@ as
 
     l_clob := logger.get_param_clob(p_params => l_params);
 
-    if l_clob != 'p_test1: test1' || gc_line_feed || 'p_test2: test2' then
+    if l_clob <> 'p_test1: test1' || gc_line_feed || 'p_test2: test2' then
       util_add_error('Not displaying correctly');
     end if;
   end get_param_clob;
@@ -234,7 +234,7 @@ as
       p_value => 'test_value',
       p_client_id => null);
 
-    if sys_context(logger.g_context_name, 'TEST') != 'test_value' then
+    if sys_context(logger.g_context_name, 'TEST') <> 'test_value' then
       util_add_error('Context not setting (globally);');
     end if;
 
@@ -245,7 +245,7 @@ as
       p_value => 'test_client_id',
       p_client_id => gc_client_id);
 
-    if sys_context(logger.g_context_name, 'TEST') != 'test_client_id' then
+    if sys_context(logger.g_context_name, 'TEST') <> 'test_client_id' then
       util_add_error('Context not setting (client_id);');
     end if;
   end save_global_context;
@@ -264,7 +264,7 @@ as
       p_extra => l_clob,
       p_params => l_params);
 
-    if l_return != 'test' then
+    if l_return <> 'test' then
       util_add_error('empty params test failed');
     end if;
 
@@ -274,7 +274,7 @@ as
       p_extra => l_clob,
       p_params => l_params);
 
-    if l_return !=
+    if l_return <>
 'test
 
 *** Parameters ***
@@ -289,7 +289,7 @@ p_test1: test1' then
       p_extra => l_clob,
       p_params => l_params);
 
-    if l_return !=
+    if l_return <>
 'test
 
 *** Parameters ***
@@ -373,7 +373,7 @@ p_test2: test2' then
       util_add_error('TRUE failing when different schema (not raising exception)');
     exception
       when others then
-        if sqlcode != -20000 then
+        if sqlcode <> -20000 then
           util_add_error('TRUE failing when differen schema (invalid error code)');
         end if;
     end;
@@ -395,7 +395,7 @@ p_test2: test2' then
 
     l_level := logger.get_level_number;
 
-    if l_level != logger.g_debug then
+    if l_level <> logger.g_debug then
       util_add_error('Level number not matching');
     end if;
 
@@ -407,7 +407,7 @@ p_test2: test2' then
     );
     l_level := logger.get_level_number;
 
-    if l_level != logger.g_error then
+    if l_level <> logger.g_error then
       util_add_error('Invalid clientid level');
     end if;
   end get_level_number;
@@ -468,7 +468,7 @@ p_test2: test2' then
     l_stop := to_date('10-Jan-2015 20:40:20', 'DD-MON-YYYY HH24:MI:SS');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '10 seconds ago' then
+        p_date_stop => l_stop) <> '10 seconds ago' then
       util_add_error('Error with seconds');
     end if;
 
@@ -477,7 +477,7 @@ p_test2: test2' then
     l_stop := to_date('10-Jan-2015 20:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '10 minutes ago' then
+        p_date_stop => l_stop) <> '10 minutes ago' then
       util_add_error('Error with minutes');
     end if;
 
@@ -486,7 +486,7 @@ p_test2: test2' then
     l_stop := to_date('10-Jan-2015 21:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '1 hour ago' then
+        p_date_stop => l_stop) <> '1 hour ago' then
       util_add_error('Error with hours');
     end if;
 
@@ -495,7 +495,7 @@ p_test2: test2' then
     l_stop := to_date('12-Jan-2015 20:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '2 days ago' then
+        p_date_stop => l_stop) <> '2 days ago' then
       util_add_error('Error with days');
     end if;
 
@@ -504,7 +504,7 @@ p_test2: test2' then
     l_stop := to_date('30-Jan-2015 20:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '2 weeks ago' then
+        p_date_stop => l_stop) <> '2 weeks ago' then
       util_add_error('Error with weeks');
     end if;
 
@@ -513,7 +513,7 @@ p_test2: test2' then
     l_stop := to_date('11-Mar-2015 20:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '2 months ago' then
+        p_date_stop => l_stop) <> '2 months ago' then
       util_add_error('Error with months');
     end if;
 
@@ -522,7 +522,7 @@ p_test2: test2' then
     l_stop := to_date('11-Mar-2016 20:40', 'DD-MON-YYYY HH24:MI');
     if logger.date_text_format_base (
         p_date_start => l_start,
-        p_date_stop => l_stop) != '1.2 years ago' then
+        p_date_stop => l_stop) <> '1.2 years ago' then
       util_add_error('Error with years');
     end if;
 
@@ -563,15 +563,15 @@ p_test2: test2' then
     where 1=1
       and scope = l_scope;
 
-    if l_row.text != 'test' then
+    if l_row.text <> 'test' then
       util_add_error('text failed');
     end if;
 
-    if l_row.logger_level != logger.g_debug then
+    if l_row.logger_level <> logger.g_debug then
       util_add_error('Level failed');
     end if;
 
-    if l_row.extra !=
+    if l_row.extra <>
 'extra
 
 *** Parameters ***
@@ -615,7 +615,7 @@ p_test1: test1' then
   begin
     g_proc_name := 'convert_level_char_to_num';
 
-    if logger.convert_level_char_to_num(p_level => logger.g_error_name) != logger.g_error then
+    if logger.convert_level_char_to_num(p_level => logger.g_error_name) <> logger.g_error then
       util_add_error('Not converting properly');
     end if;
   end convert_level_char_to_num;
@@ -626,7 +626,7 @@ p_test1: test1' then
   begin
     g_proc_name := 'convert_level_num_to_char';
 
-    if logger.convert_level_num_to_char(p_level => logger.g_information) != logger.g_information_name then
+    if logger.convert_level_num_to_char(p_level => logger.g_information) <> logger.g_information_name then
       util_add_error('Not converting properly');
     end if;
   end convert_level_num_to_char;
@@ -644,7 +644,7 @@ p_test1: test1' then
 new line',
   		p_show_common_codes => false);
 
-    if l_temp !=
+    if l_temp <>
 '  84,101,115,116, 10,110,101,119, 32,108,105,110,101
    T,  e,  s,  t,  ~,  n,  e,  w,   ,  l,  i,  n,  e' then
       util_add_error('Failed on show common codes false');
@@ -656,7 +656,7 @@ new line',
 new line',
   		p_show_common_codes => true);
 
-    if l_temp !=
+    if l_temp <>
 'Common Codes: 13=Line Feed, 10=Carriage Return, 32=Space, 9=Tab
   84,101,115,116, 10,110,101,119, 32,108,105,110,101
    T,  e,  s,  t,  ~,  n,  e,  w,   ,  l,  i,  n,  e' then
@@ -847,8 +847,8 @@ new line',
           and scope = l_scope;
 
         if 1=2
-          or (x.action = 'off' and l_count != 0)
-          or (x.action in ('self', 'on') and l_count != 1) then
+          or (x.action = 'off' and l_count <> 0)
+          or (x.action in ('self', 'on') and l_count <> 1) then
           util_add_error(l_log_fns(i).fn_name || ' failed test: ' || x.action);
         end if;
       end loop; -- x
@@ -888,7 +888,7 @@ new line',
     where 1=1
       and unit_name = upper(l_unit_name);
 
-    if l_text is null or l_text != 'START: ' || l_unit_name then
+    if l_text is null or l_text <> 'START: ' || l_unit_name then
       util_add_error('Logged text invalid: ' || l_text);
     end if;
 
@@ -995,7 +995,7 @@ new line',
     logger.set_level(p_level => logger.g_debug);
 
     l_pref := nvl(logger.get_pref('LEVEL'), 'a');
-    if l_pref != logger.g_debug_name then
+    if l_pref <> logger.g_debug_name then
       util_add_error('Global level not fetching correctly');
     end if;
 
@@ -1004,7 +1004,7 @@ new line',
       p_level => logger.g_warning,
       p_client_id => gc_client_id);
     l_pref := nvl(logger.get_pref('LEVEL'), 'a');
-    if l_pref != logger.g_warning_name then
+    if l_pref <> logger.g_warning_name then
       util_add_error('Client pref not correct');
     end if;
 
@@ -1062,13 +1062,13 @@ new line',
 
 
     log_and_count;
-    if l_count != 1 then
+    if l_count <> 1 then
       util_add_error('Not logging debug');
     end if;
 
     logger.set_level(p_level => logger.g_error);
     log_and_count;
-    if l_count != 0 then
+    if l_count <> 0 then
       util_add_error('Logging when shouldnt be');
     end if;
 
@@ -1084,7 +1084,7 @@ new line',
       p_include_call_stack => 'TRUE');
 
     log_and_count;
-    if l_count != 1 then
+    if l_count <> 1 then
       util_add_error('Not logging for client');
     else
       -- Test callstack
@@ -1130,7 +1130,7 @@ new line',
 
     logger.unset_client_level(p_client_id => gc_client_id);
     log_and_count;
-    if l_count != 0 then
+    if l_count <> 0 then
       util_add_error('unset not succesful');
     end if;
 
@@ -1152,29 +1152,29 @@ new line',
   begin
     g_proc_name := 'tochar';
 
-    if logger.tochar(1) != '1' then
+    if logger.tochar(1) <> '1' then
       util_add_error('number');
     end if;
 
     l_val := logger.tochar(to_date('1-Jan-2013'));
-    if l_val != '01-JAN-2013 00:00:00' then
+    if l_val <> '01-JAN-2013 00:00:00' then
       util_add_error('date: ' || l_val);
     end if;
 
     l_val := logger.tochar(to_timestamp ('10-sep-02 14:10:10.123000', 'dd-mon-rr hh24:mi:ss.ff'));
-    if l_val != '10-SEP-2002 14:10:10:123000000' then
+    if l_val <> '10-SEP-2002 14:10:10:123000000' then
       util_add_error('timestamp: ' || l_val);
     end if;
 
     l_val := logger.tochar(to_timestamp_tz('1999-12-01 11:00:00 -8:00', 'yyyy-mm-dd hh:mi:ss tzh:tzm'));
-    if l_val != '01-DEC-1999 11:00:00:000000000 -08:00' then
+    if l_val <> '01-DEC-1999 11:00:00:000000000 -08:00' then
       util_add_error('timezone: ' || l_val);
     end if;
 
     -- Local timezone based on above and is dependant on each system
 
     l_val := logger.tochar(true) || ':' || logger.tochar(false);
-    if l_val != 'TRUE:FALSE' then
+    if l_val <> 'TRUE:FALSE' then
       util_add_error('boolean: ' || l_val);
     end if;
 
@@ -1192,15 +1192,15 @@ new line',
       p_name => 'test',
       p_val => 'val');
 
-    if l_params.count != 1 then
+    if l_params.count <> 1 then
       util_add_error('Did not add');
     end if;
 
-    if l_params(1).name != 'test' then
+    if l_params(1).name <> 'test' then
       util_add_error('Name invalid');
     end if;
 
-    if l_params(1).val != 'val' then
+    if l_params(1).val <> 'val' then
       util_add_error('Val Invalid');
     end if;
   end append_param;
