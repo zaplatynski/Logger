@@ -631,8 +631,7 @@ as
    */
   function include_call_stack
     return boolean
-    $if 1=1
-      and $$rac_lt_11_2
+    $if   $$rac_lt_11_2
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id)
@@ -1077,9 +1076,9 @@ as
         dbms_output.put_line('l_plugin_fn: ' || l_plugin_fn);
       $end
 
-      if 1=1
-        and l_plugin_fn is not null
-        and l_plugin_fn <> 'NONE' then
+      if    l_plugin_fn is not null
+        and l_plugin_fn <> 'NONE'
+        then
 
         l_sql := 'begin ' || l_plugin_fn || '(logger.get_plugin_rec(' || p_logger_log.logger_level || ')); end;';
 
@@ -1109,8 +1108,7 @@ as
       select scope
       into l_scope
       from logger_logs_5_min
-      where 1=1
-        and id = p_logger_log.id;
+      where id = p_logger_log.id;
 
       logger.log_error('Exception in plugin procedure: ' || l_plugin_fn, l_scope, null, l_params);
 
@@ -1256,8 +1254,7 @@ as
   function ok_to_log(p_level in number,
     p_scope in varchar2 default null)
     return boolean
-    $if 1=1
-      and $$rac_lt_11_2
+    $if   $$rac_lt_11_2
       and not dbms_db_version.ver_le_10_2
       and ($$no_op is null or not $$no_op) $then
         result_cache relies_on (logger_prefs, logger_prefs_by_client_id, logger_prefs_by_scope) -- PBA/MNU 201704
@@ -1461,23 +1458,18 @@ as
           -- Application items
           select 1 app_page_seq, 0 page_id, item_name, v(item_name) item_value
           from apex_application_items
-          where 1=1
-            and application_id = l_app_id
+          where application_id = l_app_id
             and l_item_type in (logger.g_apex_item_type_all, logger.g_apex_item_type_app)
           union all
           -- Application page items
           select 2 app_page_seq, page_id, item_name, v(item_name) item_value
           from apex_application_page_items
-          where 1=1
-            and application_id = l_app_id
-            and (
-              1=2
-              or l_item_type in (logger.g_apex_item_type_all, logger.g_apex_item_type_page)
+          where application_id = l_app_id
+            and ( l_item_type in (logger.g_apex_item_type_all, logger.g_apex_item_type_page)
               or (l_item_type_page_id is not null and l_item_type_page_id = page_id)
             )
           )
-        where 1=1
-          and (l_log_null_item_yn = 'Y' or item_value is not null)
+        where l_log_null_item_yn = 'Y' or item_value is not null
         order by app_page_seq, page_id, item_name;
 
       $end -- $if $$apex $then
@@ -2377,8 +2369,7 @@ as
             end pref_value,
             1 rank
           from logger_prefs_by_client_id
-          where 1=1
-            and client_id = l_client_id
+          where client_id = l_client_id
             -- Only try to get prefs at a client level if pref is in LEVEL or INCLUDE_CALL_STACK
             and l_client_id is not null
             -- #127
@@ -2390,8 +2381,7 @@ as
           -- System level configuration
           select pref_value, 2 rank
           from logger_prefs
-          where 1=1
-            and pref_name = l_pref_name
+          where pref_name = l_pref_name
             and pref_type = l_pref_type
         )
       )
@@ -2442,8 +2432,7 @@ as
       merge into logger_prefs p
       using (select l_pref_type pref_type, l_pref_name pref_name, p_pref_value pref_value
              from dual) args
-      on ( 1=1
-        and p.pref_type = args.pref_type
+      on (  p.pref_type = args.pref_type
         and p.pref_name = args.pref_name)
       when matched then
         update
@@ -2486,8 +2475,7 @@ as
       end if;
 
       delete from logger_prefs
-      where 1=1
-        and pref_type = l_pref_type
+      where pref_type = l_pref_type
         and pref_name = l_pref_name;
     $end
   end del_pref;
@@ -2660,8 +2648,7 @@ as
       select pref_value
       into l_debug
       from logger_prefs
-      where 1=1
-        and pref_type = logger.g_pref_type_logger
+      where pref_type = logger.g_pref_type_logger
         and pref_name = logger.gc_pref_level;
 
       $if $$flashback_enabled $then
@@ -2821,8 +2808,7 @@ as
           -- Global settings
           update logger_prefs
           set pref_value = l_level
-          where 1=1
-            and pref_type = logger.g_pref_type_logger
+          where pref_type = logger.g_pref_type_logger
             and pref_name = logger.gc_pref_level;
         end if;
 

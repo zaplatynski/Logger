@@ -80,8 +80,7 @@ create table logger_logs(
     select count(1)
     into l_count
     from user_tab_columns
-    where 1=1
-      and table_name = 'LOGGER_LOGS'
+    where table_name = 'LOGGER_LOGS'
       and column_name = l_new_cols(i).column_name;
 
     if l_count = 0 then
@@ -134,8 +133,7 @@ begin
   select count(1)
   into l_count
   from user_triggers
-  where 1=1
-    and trigger_name = l_trigger_name;
+  where trigger_name = l_trigger_name;
 
   if l_count > 0 then
     execute immediate 'drop trigger ' || l_trigger_name;
