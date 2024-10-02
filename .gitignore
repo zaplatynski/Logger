@@ -13,5 +13,11 @@ Sandbox/
 *.tst
 *.dsk
 *.prj
+
 # Eclipse
-/.project
+.project
+.settings
+
+# PL/SQL Developer Metadata
+*.dsk
+*.prj
